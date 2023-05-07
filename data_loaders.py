@@ -2,58 +2,66 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+import warnings
 
-#TODO try to merge or standardize these two ways of loading data:
-# - associate better names to them
-# - scale in both
-# - both of them have to accept input features and output features to be parametrizable
+class WakeDataset(Dataset):
 
+    def __init__(
+            self, data_filepath: str,
+            input_variables: list[str],
+            output_variables: list[str],
+            scaler = MinMaxScaler() #TODO MinMaxScaler or StandardScaler?
+        ) -> None:
+        super().__init__()
 
+        self.__df = pd.read_csv(data_filepath)
 
+        assert set(input_variables) <= set(self.__df.columns) and \
+            set(output_variables) <= set(self.__df.columns) and \
+            set(input_variables).isdisjoint(output_variables)
+        self.__input_vars = input_variables
+        self.__output_vars = output_variables
 
-class MultivariateWakeDataset(Dataset):
-    def __init__(self, data_filepath: str, input_variables: list[str]): #TODO scaler????
-        #TODO MinMaxScaler or StandardScaler?
-        self._dataframe = pd.read_csv(data_filepath)
+        self.__scaler = scaler
 
-        # Group by input features and create input and output tensors
-        inputs = []
-        outputs = []
-        for group, data in self._dataframe.groupby(input_variables):
-            inputs.append(torch.tensor(group, dtype=torch.float32))
-            outputs.append(torch.tensor(data['WS_eff'].values, dtype=torch.float32))
-
-        self.x = inputs
-        self.y = outputs
+        if set(["x", "y"]) <= set(input_variables):
+            self.__prepare_univariate()
+        else:
+            self.__prepare_multivariate()
         
-    def __len__(self):
-        return len(self.x)
-
-    def __getitem__(self, idx):
-        return self.x[idx], self.y[idx]
-
-def get_multivariate_dataloader(data_filepath: str, input_variables: list[str], batch_size: int):
-    ds = MultivariateWakeDataset(data_filepath, input_variables)
-    return DataLoader(ds, batch_size=batch_size, shuffle=True)
-
-
-class UnivariateWakeDataset(Dataset):
-    def __init__(self, data_filepath: str, output_space: int, scaler = MinMaxScaler()):
-        #TODO MinMaxScaler or StandardScaler?
-        self._dataframe = pd.read_csv(data_filepath)
-
-        self.x = self._dataframe.iloc[:, :-output_space]
-        self.x = torch.FloatTensor(scaler.fit_transform(self.x))
-        self.y = self._dataframe.iloc[:, -output_space:]
-        self.y = torch.FloatTensor(self.y.values)
         assert len(self.x) == len(self.y)
     
+    def __prepare_univariate(self):
+        #TODO change name and/or explain this approach
+
+        self.x = self.__df[self.__input_vars]
+        self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
+        self.y = self.__df[self.__output_vars]
+        self.y = torch.FloatTensor(self.y.values)
+
+    def __prepare_multivariate(self):
+        #TODO change name and/or explain this approach
+
+        warnings.warn("Currently, only one output feature (WS_eff) is considered in multivariate setting, the others are ignored") #TODO
+        # Group by input features and create input and output tensors
+        inputs = list()
+        outputs = list()
+        for group, data in self.__df.groupby(self.__input_vars):
+            inputs.append(torch.FloatTensor(group))
+            outputs.append(torch.FloatTensor(data['WS_eff'].values))
+
+        self.x = torch.stack(inputs, dim=0)
+        self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
+        self.y = torch.stack(outputs, dim=0)
+
     def __len__(self):
         return len(self.x)
 
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
 
-def get_univariate_dataloader(data_filepath: str, output_space: int, batch_size: int):
-    ds = UnivariateWakeDataset(data_filepath, output_space)
+def get_wake_dataloader(data_filepath: str, input_variables: list[str], output_variables: list[str],
+                        scaler: MinMaxScaler(), #TODO
+                        batch_size: int):
+    ds = WakeDataset(data_filepath, input_variables, output_variables, scaler)
     return DataLoader(ds, batch_size=batch_size, shuffle=True)
