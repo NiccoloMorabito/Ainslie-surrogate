@@ -1,6 +1,7 @@
 import random
 import os
 import pandas as pd
+import xarray as xr
 
 def random_split_list(wind_speeds, test_perc, valid_perc):
     #TODO change name of all things with "wind_speeds" to make it generic
@@ -35,9 +36,9 @@ def get_dir_name(x_start_factor: int, x_end_factor: int,
 
 def get_filepath(x_start_factor: int, x_end_factor: int,
                     y_start_factor: int, y_end_factor: int,
-                    grid_step_factor: float, wind_speed: int) -> str:
+                    grid_step_factor: float, wind_speed: int) -> str: #TODO more explaining method name
     dir = get_dir_name(x_start_factor, x_end_factor, y_start_factor, y_end_factor, grid_step_factor)
-    filename = f"ws_{wind_speed}.csv"
+    filename = f"ws_{wind_speed}.nc"
     return os.path.join(dir, filename)
 
 def get_discr_factors(dir_name: str) -> tuple[int, int, int, int, float]:
@@ -56,3 +57,13 @@ def load_csv(data_folder: str, wind_speed: int, include_ws_column: bool = True) 
     if include_ws_column:
         df["ws"] = wind_speed
     return df
+
+def load_netcfd(data_folder: str, wind_speed: int, include_ws_column: bool = True) -> pd.DataFrame:
+    filepath = os.path.join(data_folder, f"ws_{wind_speed}.nc")
+    ds = xr.open_dataset(filepath)\
+            .to_dataframe()\
+            .reset_index()\
+            .rename(columns={"x:D": "x/D", "y:D": "y/D"})
+    if include_ws_column:
+        return ds.rename(columns={"WS": "ws"}) #TODO
+    return ds.drop("WS", axis=1)
