@@ -27,7 +27,7 @@ def __load_and_split_data_by_input_params(
     """
     Function to split the data in training, test and possibly validation
     """
-    df = utils.load_csv(data_folder, wind_speed=12, include_ws_column=True) #TODO random value here
+    df = utils.load_netcfd(data_folder, wind_speed=12, include_ws_column=True) #TODO random value here
     input_combs = df[INPUT_VARIABLES].drop_duplicates()
 
     # Sampling from input combinations
@@ -53,21 +53,23 @@ def __load_and_split_data_by_speed(data_folder: str, test_perc: float = 0.2, val
     assert os.path.isdir(data_folder), "You need to pass a folder to load all the files in it"
     files = os.listdir(data_folder)
     assert len(files) > 0, "No files in this directory"
-    assert all ([file.endswith(".csv") and file.startswith("ws_") for file in files]),\
-         "All the files in the specified folder should be csv for dataframes of a specific wind speed"
-    wind_speeds = [int(file.split(".csv")[0].split("_")[1]) for file in files]
+    assert all ([file.endswith(".nc") and file.startswith("ws_") for file in files]),\
+         "All the files in the specified folder should be nc for xarray dataset of a specific wind speed"
+    wind_speeds = [int(file.split(".nc")[0].split("_")[1]) for file in files]
 
     ws_split_lists = utils.random_split_list(wind_speeds, test_perc, valid_perc) #TODO
 
     #TODO extract method for these list comprehensions + concat?
-    train_df = pd.concat([utils.load_csv(data_folder, ws_value, include_ws_column=True)\
+    train_df = pd.concat([utils.load_netcfd(data_folder, ws_value, include_ws_column=True)\
                     for ws_value in ws_split_lists[0]])
     if len(ws_split_lists) > 2: #also validation
-        validation_df = pd.concat([utils.load_csv(data_folder, ws_value, include_ws_column=True)\
+        validation_df = pd.concat([utils.load_netcfd(data_folder, ws_value, include_ws_column=True)\
                     for ws_value in ws_split_lists[1]])
-        test_df = pd.concat([utils.load_csv(data_folder, ws_value, include_ws_column=True)\
+        test_df = pd.concat([utils.load_netcfd(data_folder, ws_value, include_ws_column=True)\
                     for ws_value in ws_split_lists[2]])
         return train_df, validation_df, test_df
+    test_df = pd.concat([utils.load_netcfd(data_folder, ws_value, include_ws_column=True)\
+                    for ws_value in ws_split_lists[1]])
     return train_df, test_df
 
 def __load_and_split_data(data_folder: str, consider_ws: bool,
