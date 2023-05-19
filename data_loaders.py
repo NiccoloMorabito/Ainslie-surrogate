@@ -7,11 +7,11 @@ import utils
 
 # TODO these variables control also the architecture of the ML models
 INPUT_VARIABLES = ["ti", "ct"]
-OUTPUT_VARIABLES = ["wind_deficit"]
+OUTPUT_VARIABLE = "wind_deficit"
 COORDS_VARIABLES = ["x/D", "y/D"]
 
-assert set(INPUT_VARIABLES).isdisjoint(OUTPUT_VARIABLES),\
-    "Wrong lists of input and output variables"
+assert set(INPUT_VARIABLES).isdisjoint(OUTPUT_VARIABLE),\
+    "Wrong lists of input and output variables" #TODO
 
 #TODO clean and clarify all this code:
 # - clean and fix it in general
@@ -97,12 +97,13 @@ class WakeDataset(Dataset):
             self, df: pd.DataFrame,
             coords_as_input: bool,
             scaler = MinMaxScaler() #TODO MinMaxScaler or StandardScaler?
+            # choose a scaling method taking the ranges?
             #TODO must accept the diameter step at least (to standardize the grid)
         ) -> None:
         super().__init__()
         self.__df = df
         assert set(INPUT_VARIABLES) <= set(self.__df.columns) and \
-            set(OUTPUT_VARIABLES) <= set(self.__df.columns)
+            {OUTPUT_VARIABLE} <= set(self.__df.columns)
         self.__scaler = scaler
 
         if coords_as_input:
@@ -118,8 +119,8 @@ class WakeDataset(Dataset):
         self.x = self.__df[INPUT_VARIABLES + ["x/D", "y/D"]]
         self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
         #TODO this scaler ^^^^^^^ myst be used to fit (and only to fit?) the test set
-        self.y = self.__df[OUTPUT_VARIABLES]
-        self.y = torch.FloatTensor(self.y.values)
+        self.y = self.__df[OUTPUT_VARIABLE].values
+        self.y = torch.FloatTensor(self.y).unsqueeze(1)
 
     def __prepare_multivariate(self):
         #TODO change name and/or explain this approach
@@ -133,14 +134,16 @@ class WakeDataset(Dataset):
             inputs.append(input_tensor)
 
             #TODO so far only one output variable (WS_eff)
-            output_tensor = data.pivot(index='x/D', columns='y/D', values='wind_deficit').values # 2d output tensor
-            #output_tensor = data['WS_eff'].values) #1d output tensor
+            #output_tensor = data.pivot(index='x/D', columns='y/D', values='wind_deficit').values # 2d output tensor
+            output_tensor = data[OUTPUT_VARIABLE].values #1d output tensor
             output_tensor = torch.FloatTensor(output_tensor)
+            #print(output_tensor.shape)
             outputs.append(output_tensor)
 
         self.x = torch.stack(inputs, dim=0)
         self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
-        self.y = torch.stack(outputs, dim=0)
+        #TODO scaling only if wind speed is included, otherwise ct and ti have the same ranges
+        self.y = torch.stack(outputs)
 
     def __len__(self):
         return len(self.x)
