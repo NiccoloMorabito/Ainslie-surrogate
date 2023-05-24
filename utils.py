@@ -39,6 +39,12 @@ def random_split_list(input_list : list, perc_part2: float, perc_part3: float = 
         return part1, part2, part3
     return part1, part2
 
+def get_wake_coordinates_from_discr_factors(
+        x_start_factor, x_end_factor, y_start_factor, y_end_factor, grid_factor):
+    x_range = np.arange(x_start_factor, x_end_factor, grid_factor)
+    y_range = np.arange(y_start_factor, y_end_factor, grid_factor)
+    return x_range, y_range
+
 """Utils for data files"""
 def get_dir_name(x_start_factor: int, x_end_factor: int,
                     y_start_factor: int, y_end_factor: int,

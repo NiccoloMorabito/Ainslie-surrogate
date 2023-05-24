@@ -85,7 +85,7 @@ def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int]) -> pd
 def __load_and_split_data_by_input_params(
         data_folder: str,
         train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0)\
-             -> tuple(pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
     Function to split the data in training, test and possibly validation sets
     according to the input variables.
@@ -123,7 +123,7 @@ class WakeDataset(Dataset):
     def __init__(
             self, df: pd.DataFrame,
             coords_as_input: bool,
-            scaler
+            scaler = MinMaxScaler()
         ) -> None:
         super().__init__()
         self.__df = df
@@ -158,17 +158,20 @@ class WakeDataset(Dataset):
             input_tensor = torch.FloatTensor(group)
             inputs.append(input_tensor)
 
-            #TODO so far only one output variable (WS_eff)
-            #output_tensor = data.pivot(index='x/D', columns='y/D', values='wind_deficit').values # 2d output tensor
-            output_tensor = data[OUTPUT_VARIABLE].values #1d output tensor
+            output_tensor = data.pivot(index='y/D', columns='x/D',
+                                       values=OUTPUT_VARIABLE).values # 2d output tensor wit shape: (num_unique_y_values, num_unique_x_values)
+            output_tensor = output_tensor.reshape(-1) #1d output tensor
             output_tensor = torch.FloatTensor(output_tensor)
             outputs.append(output_tensor)
+
 
         self.x = torch.stack(inputs, dim=0)
         if WS in INPUT_VARIABLES:
             # scaling only if wind speed is included, otherwise ct and ti have the same ranges
             self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
         self.y = torch.stack(outputs)
+
+        #self.coordinates = self.__df["x/D"].unique(), self.__df["y/D"].unique()
 
     def __len__(self) -> int:
         return len(self.x)
