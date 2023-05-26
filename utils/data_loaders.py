@@ -3,7 +3,8 @@ from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import os
-import utils
+import utils.utils as utils
+import utils.data_utils as data_utils
 
 INPUT_VARIABLES = ["ti", "ct"]
 WS = "ws"
@@ -79,7 +80,7 @@ def __load_and_split_data_by_speed(
     return train_df, test_df
 
 def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int]) -> pd.DataFrame:
-    return pd.concat([utils.load_netcfd(data_folder, wind_speed, include_ws_column=True)\
+    return pd.concat([data_utils.load_netcfd(data_folder, wind_speed, include_ws_column=True)\
                       for wind_speed in wind_speeds])
 
 def __load_and_split_data_by_input_params(
@@ -90,7 +91,7 @@ def __load_and_split_data_by_input_params(
     Function to split the data in training, test and possibly validation sets
     according to the input variables.
     """
-    df = utils.load_netcfd(data_folder, wind_speed=12, include_ws_column=True) #TODO random value here
+    df = data_utils.load_netcfd(data_folder, wind_speed=12, include_ws_column=True) #TODO random value here
     input_combs = df[INPUT_VARIABLES].drop_duplicates()
 
     # Sampling from input combinations
