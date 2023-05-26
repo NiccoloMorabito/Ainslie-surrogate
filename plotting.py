@@ -3,9 +3,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import torch
+from py_wake.wind_turbines import WindTurbine, WindTurbines
 
 DEFAULT_XLABEL = "Downwind distance [x/D]"
 DEFAULT_YLABEL = "Crosswind distance [y/D]"
+
+def plot_ct_curve(turbines: list[WindTurbine]) -> None:
+    plt.xlabel('Wind speed [m/s]')
+    plt.ylabel('CT [-]')
+    wts = WindTurbines.from_WindTurbine_lst(turbines)
+    ws = np.arange(0,30)
+    for t in wts.types():
+        plt.plot(ws, wts.ct(ws, type=t),'.-', label=wts.name(t))
+    plt.legend(loc=1)
+    plt.show()
 
 # CONTOUR PLOTS
 # TODO write more meaninfgul default values for levels (i.e. the number of values of z that are shown)
