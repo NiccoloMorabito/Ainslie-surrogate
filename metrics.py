@@ -11,8 +11,8 @@ class RMSELoss(nn.Module):
         self.mse = nn.MSELoss()
         self.eps = eps
         
-    def forward(self,yhat,y):
-        loss = torch.sqrt(self.mse(yhat,y) + self.eps)
+    def forward(self, yhat, y):
+        loss = torch.sqrt(self.mse(yhat, y) + self.eps)
         return loss
 
 def field_based_rmse(wf1, wf2):
@@ -109,7 +109,7 @@ class MetricsLogger:
                 os.makedirs(folder)
             timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
             name = re.sub(r'\W+', '', self.name).replace(" ", "-")
-            filename = f"{name}_metrics_{timestamp}.csv"
+            filename = f"{name}_{timestamp}.csv"
             filepath = os.path.join(folder, filename)
         self.df.to_csv(filepath)
         print(f"Metrics exported in the following csv file: {filepath}")
