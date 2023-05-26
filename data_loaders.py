@@ -159,19 +159,16 @@ class WakeDataset(Dataset):
             inputs.append(input_tensor)
 
             output_tensor = data.pivot(index='y/D', columns='x/D',
-                                       values=OUTPUT_VARIABLE).values # 2d output tensor wit shape: (num_unique_y_values, num_unique_x_values)
+                                       values=OUTPUT_VARIABLE).values # 2d output tensor with shape: (num_unique_y_values, num_unique_x_values)
             output_tensor = output_tensor.reshape(-1) #1d output tensor
             output_tensor = torch.FloatTensor(output_tensor)
             outputs.append(output_tensor)
-
 
         self.x = torch.stack(inputs, dim=0)
         if WS in INPUT_VARIABLES:
             # scaling only if wind speed is included, otherwise ct and ti have the same ranges
             self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
         self.y = torch.stack(outputs)
-
-        #self.coordinates = self.__df["x/D"].unique(), self.__df["y/D"].unique()
 
     def __len__(self) -> int:
         return len(self.x)
