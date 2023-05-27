@@ -49,7 +49,7 @@ def plot_map(df: pd.DataFrame, zname: str, zlabel: str, levels: int = 500, cmap:
                    levels=levels, cmap=cmap)
 
 def plot_map_from_tensor(X, Y, wake_field, ti: float, ct: float, ws: int,
-                         zlabel: str = "Wind deficit", levels=500, cmap='Blues') -> None:
+                         zlabel: str = "Wind deficit", levels: int = 500, cmap: str ='Blues') -> None:
     assert X.shape == Y.shape
     if wake_field.dim() == 1:
         wake_field = wake_field.reshape(X.shape)
@@ -82,6 +82,8 @@ def plot_error_map(X, Y, original_wake_field, predicted_wake_field, type_of_erro
 
 def __plot_contour(X, Y, Z,
                    xlabel: str, ylabel: str, zlabel: str, title: str, levels: int, cmap: str) -> None:
+    if not levels:
+        levels = np.linspace(-np.max(Z), np.max(Z), 100)
     ax = plt.gca()
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
