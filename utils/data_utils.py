@@ -1,8 +1,6 @@
 import os
 import pandas as pd
 import xarray as xr
-import numpy as np
-from .utils import my_arange
 
 def get_dir_name(x_start_factor: int, x_end_factor: int,
                     y_start_factor: int, y_end_factor: int,
@@ -42,63 +40,42 @@ def load_csv(data_folder: str, wind_speed: int, include_ws_column: bool = True) 
     return df
 
 def load_netcfd(data_folder: str, wind_speed: int, include_ws_column: bool = True,
-                   filter_condition: str | None = None,
-                   input_var_to_reduced_step: dict | None = None,
+                   x_scaled_range: tuple[int, int] | None = None,
+                   y_scaled_range: tuple[int, int] | None = None,
+                   input_var_to_reduction_factor: dict | None = None,
                    resolution_reduction_factor: int | None = None) -> pd.DataFrame:
     filepath = os.path.join(data_folder, f"ws_{wind_speed}.nc")
-    df = xr.open_dataset(filepath)\
-            .to_dataframe()\
-            .reset_index()\
-            .rename(columns={"x:D": "xD", "y:D": "yD"})
-    
-    if filter_condition:
-        df = df.query(filter_condition.replace("/", ""))
-    df.rename(columns={"xD": "x/D", "yD": "y/D"}, inplace=True)
+    ds = xr.open_dataset(filepath)
 
+    if x_scaled_range:
+        if len(x_scaled_range) != 2 or x_scaled_range[0] >= x_scaled_range[1]:
+            raise ValueError("The range of x/D is not valid")
+        ds = ds.where((ds['x:D'] >= x_scaled_range[0]) & (ds['x:D'] <= x_scaled_range[1]), drop=True)
+    if y_scaled_range:
+        if len(y_scaled_range) != 2 or y_scaled_range[0] >= y_scaled_range[1]:
+            raise ValueError("The range of y/D is not valid")
+        ds = ds.where((ds['y:D'] >= y_scaled_range[0]) & (ds['y:D'] <= y_scaled_range[1]), drop=True)
+    
+    if input_var_to_reduction_factor:
+        for input_var, skip_factor in input_var_to_reduction_factor.items():
+            ds = ds.isel({input_var:slice(0, ds[input_var].size, skip_factor)})
+    
     if resolution_reduction_factor:
-        df = reduce_grid_resolution(df, resolution_reduction_factor, resolution_reduction_factor)
-    
-    if input_var_to_reduced_step:
-        df = reduce_range_input_params(df, input_var_to_reduced_step)
+        ds = ds.isel({'x:D':slice(0, ds['x:D'].size*2, resolution_reduction_factor)})\
+                .isel({'y:D':slice(0, ds['y:D'].size*2, resolution_reduction_factor)})
 
+    df = ds.to_dataframe()\
+            .reset_index()\
+            .rename(columns={"x:D": "x/D", "y:D": "y/D"})
+    
     if include_ws_column:
         return df.rename(columns={"WS": "ws"}) #TODO
     return df.drop("WS", axis=1)
 
-def reduce_grid_resolution(df: pd.DataFrame, x_factor: int, y_factor: int) -> pd.DataFrame:
-    dataframes = list()
-    # only reduce resolution for each combination of input variables
-    for _, data in df.groupby(['ti', 'ct', 'WS']):
-        vars_to_avg = ['wind_deficit', 'WS_eff']
-        agg_dict = {**{col: 'first' for col in df.columns if col not in vars_to_avg},\
-            **{col: 'mean' for col in vars_to_avg}}
-        
-        # combining rows for y/D
-        data = data.sort_values(by=['y/D', 'x/D']).reset_index(drop=True)
-        data['group'] = (data.index // y_factor) + 1
-        data = data.groupby('group').agg(agg_dict)
-        
-        # combining rows for x/D
-        data = data.sort_values(by=['x/D', 'y/D']).reset_index(drop=True)
-        data['group'] = (data.index // x_factor) + 1
-        data = data.groupby('group').agg(agg_dict)
-
-        dataframes.append(data.reset_index(drop=True))
-    return pd.concat(dataframes)
-
-def reduce_range_input_params(df: pd.DataFrame, input_var_to_reduced_step: dict[str, float]) -> pd.DataFrame:
-    conditions = [condition_for_reduced_step(df, column=var, desired_step=input_var_to_reduced_step[var])
-                  for var in input_var_to_reduced_step.keys()]
-    return df[np.logical_and.reduce(conditions)].reset_index(drop=True)
-
-def condition_for_reduced_step(df: pd.DataFrame, column: str, desired_step: float) -> pd.Series:
-    return df[column].isin(my_arange(df[column].min(), df[column].max(),
-                                           desired_step, include_end=True))
-
 
 if __name__=='__main__':
     folder = "data/discr_factors_x2_50_y-1_1_step0.125_TIstep0.01_CTstep0.01"
-    reduced_df = load_netcfd(folder, 5,
-                    filter_condition = "x/D > 10 and y/D > 0",
-                   input_var_to_reduced_step = {'ti': 0.02, 'ct': 0.02},
-                   resolution_reduction_factor = 2)
+    reduced_df = load_netcfd(folder, 12,
+                    x_scaled_range=(2, 30), y_scaled_range=(-1, 1),
+                    input_var_to_reduction_factor={'ti': 10, 'ct': 10}, #10 times less values of ti and ct
+                    resolution_reduction_factor=2) #grid resolution halved
