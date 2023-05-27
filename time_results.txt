@@ -1,0 +1,83 @@
+MONITORING TIME
+
+PyWake generation with the following parameters (incomplete but seems reliable anyway)
+# default parameters
+TURBINE_X = [0], TURBINE_Y = [0], WIND_DIRECTION = 270 
+
+# IEA37 values
+TURBINE_DIAMETER = 198, TURBINE_HUB_HEIGHT = 119, TURBINE_POWER_NORM = 10000
+
+# discretization factors
+X_START_FACTOR = 2, X_END_FACTOR = 20, Y_START_FACTOR = -5, Y_END_FACTOR = 5, GRID_STEP_FACTOR = 1/8
+
+# parameters for data generation
+WS_RANGE = range(3, 26), TI_STEP = 0.01, CT_STEP = 0.01, TIs = utils.my_arange(0, 1, TI_STEP), CTs = utils.my_arange(0.2, 24/25, CT_STEP)
+
+For wind_speed=3] Execution time: 8515.641827106476 seconds for 7600 simulations -> 1.120479s per simulation
+For wind_speed=4] Execution time: 8498.752365112305 seconds for 7600 simulations -> 1.118257s per simulation
+For wind_speed=5] Execution time: 8514.600550889969 seconds for 7600 simulations -> 1.120342s per simulation
+For wind_speed=6] Execution time: 8463.694307804108 seconds for 7600 simulations -> 1.113644s per simulation
+
+
+---
+
+
+Using a Multivariate Neural Network with hidden layers: 50, 500 -> 3000/4000x factor
+
+For wind_speed=3] Execution time: 2.8248157501220703 seconds for 7600 simulations -> 0.000372s per simulation
+For wind_speed=4] Execution time: 2.27976393699646 seconds for 7600 simulations -> 0.000300s per simulation
+For wind_speed=5] Execution time: 2.286773920059204 seconds for 7600 simulations -> 0.000301s per simulation
+For wind_speed=6] Execution time: 2.436316967010498 seconds for 7600 simulations -> 0.000321s per simulation
+For wind_speed=7] Execution time: 2.0258140563964844 seconds for 7600 simulations -> 0.000267s per simulation
+For wind_speed=8] Execution time: 2.0187950134277344 seconds for 7600 simulations -> 0.000266s per simulation
+For wind_speed=9] Execution time: 2.08022403717041 seconds for 7600 simulations -> 0.000274s per simulation
+For wind_speed=10] Execution time: 2.394908905029297 seconds for 7600 simulations -> 0.000315s per simulation
+For wind_speed=11] Execution time: 2.024256944656372 seconds for 7600 simulations -> 0.000266s per simulation
+For wind_speed=12] Execution time: 1.9863471984863281 seconds for 7600 simulations -> 0.000261s per simulation
+For wind_speed=13] Execution time: 2.0958127975463867 seconds for 7600 simulations -> 0.000276s per simulation
+For wind_speed=14] Execution time: 2.706801176071167 seconds for 7600 simulations -> 0.000356s per simulation
+For wind_speed=15] Execution time: 2.170804977416992 seconds for 7600 simulations -> 0.000286s per simulation
+For wind_speed=16] Execution time: 2.5948071479797363 seconds for 7600 simulations -> 0.000341s per simulation
+For wind_speed=17] Execution time: 2.6022541522979736 seconds for 7600 simulations -> 0.000342s per simulation
+For wind_speed=18] Execution time: 2.051172971725464 seconds for 7600 simulations -> 0.000270s per simulation
+For wind_speed=19] Execution time: 2.1171529293060303 seconds for 7600 simulations -> 0.000279s per simulation
+For wind_speed=20] Execution time: 2.2838239669799805 seconds for 7600 simulations -> 0.000301s per simulation
+For wind_speed=21] Execution time: 2.0146679878234863 seconds for 7600 simulations -> 0.000265s per simulation
+For wind_speed=22] Execution time: 2.006654739379883 seconds for 7600 simulations -> 0.000264s per simulation
+For wind_speed=23] Execution time: 14.812232971191406 seconds for 7600 simulations -> 0.001949s per simulation
+For wind_speed=24] Execution time: 2.0728399753570557 seconds for 7600 simulations -> 0.000273s per simulation
+For wind_speed=25] Execution time: 1.9241232872009277 seconds for 7600 simulations -> 0.000253s per simulation
+
+Overall execution time for 174800 simulations: 63.81116580963135 seconds -> 0.000365s per simulation
+
+
+---
+
+
+Using a Multivariate Neural Network with hidden layers: 50, 500, 2500 -> 300x factor
+
+For wind_speed=3] Execution time: 28.539746046066284 seconds for 7600 simulations -> 0.003755s per simulation
+For wind_speed=4] Execution time: 28.614805936813354 seconds for 7600 simulations -> 0.003765s per simulation
+For wind_speed=5] Execution time: 29.45336079597473 seconds for 7600 simulations -> 0.003875s per simulation
+For wind_speed=6] Execution time: 28.728474140167236 seconds for 7600 simulations -> 0.003780s per simulation
+For wind_speed=7] Execution time: 29.862894773483276 seconds for 7600 simulations -> 0.003929s per simulation
+For wind_speed=8] Execution time: 29.59728980064392 seconds for 7600 simulations -> 0.003894s per simulation
+For wind_speed=9] Execution time: 29.345993041992188 seconds for 7600 simulations -> 0.003861s per simulation
+For wind_speed=10] Execution time: 29.615293979644775 seconds for 7600 simulations -> 0.003897s per simulation
+For wind_speed=11] Execution time: 29.477768898010254 seconds for 7600 simulations -> 0.003879s per simulation
+For wind_speed=12] Execution time: 29.633245944976807 seconds for 7600 simulations -> 0.003899s per simulation
+For wind_speed=13] Execution time: 29.356102228164673 seconds for 7600 simulations -> 0.003863s per simulation
+For wind_speed=14] Execution time: 28.393598318099976 seconds for 7600 simulations -> 0.003736s per simulation
+For wind_speed=15] Execution time: 28.7621328830719 seconds for 7600 simulations -> 0.003784s per simulation
+For wind_speed=16] Execution time: 29.749958992004395 seconds for 7600 simulations -> 0.003914s per simulation
+For wind_speed=17] Execution time: 28.824918031692505 seconds for 7600 simulations -> 0.003793s per simulation
+For wind_speed=18] Execution time: 28.69409990310669 seconds for 7600 simulations -> 0.003776s per simulation
+For wind_speed=19] Execution time: 28.82777714729309 seconds for 7600 simulations -> 0.003793s per simulation
+For wind_speed=20] Execution time: 29.05777883529663 seconds for 7600 simulations -> 0.003823s per simulation
+For wind_speed=21] Execution time: 28.54892611503601 seconds for 7600 simulations -> 0.003756s per simulation
+For wind_speed=22] Execution time: 28.560930252075195 seconds for 7600 simulations -> 0.003758s per simulation
+For wind_speed=23] Execution time: 28.50800609588623 seconds for 7600 simulations -> 0.003751s per simulation
+For wind_speed=24] Execution time: 28.547227144241333 seconds for 7600 simulations -> 0.003756s per simulation
+For wind_speed=25] Execution time: 28.494643926620483 seconds for 7600 simulations -> 0.003749s per simulation
+
+Overall execution time for 174800 simulations: 667.1949732303619 seconds -> 0.003817s per simulation
