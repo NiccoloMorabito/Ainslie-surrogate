@@ -108,7 +108,7 @@ class MetricsLogger:
             if not os.path.exists(folder):
                 os.makedirs(folder)
             timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-            name = re.sub(r'\W+', '', self.name).replace(" ", "-")
+            name = re.sub(r'[^a-zA-Z0-9 -]', '', self.name).replace(" ", "-")
             filename = f"{name}_{timestamp}.csv"
             filepath = os.path.join(folder, filename)
         self.df.to_csv(filepath)

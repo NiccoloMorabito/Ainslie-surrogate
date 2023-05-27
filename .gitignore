@@ -158,3 +158,5 @@ cython_debug/
 jensen.yml
 test_floris_pywake.ipynb
 temp_code.ipynb
+
+.vscode/
