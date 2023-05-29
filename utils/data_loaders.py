@@ -21,10 +21,21 @@ def get_wake_dataloaders(data_filepath: str,
                          coords_as_input: bool,
                          train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
                          scaler=MinMaxScaler(), #TODO try also StandardScaler or choose a scaler taking ranges
-                         batch_size: int = 64
+                         batch_size: int | None = None,
+                         batch_multiplier: int | None = None
                          ) -> tuple[DataLoader, DataLoader] | tuple[DataLoader, DataLoader, DataLoader]:
+    if batch_size is not None and batch_multiplier is not None:
+        raise ValueError("Cannot specify both batch_size and batch_multiplier.")
+    elif coords_as_input and batch_multiplier is None:
+        raise ValueError("batch_multiplier must be specified in case of univariate setting.")
+    elif not coords_as_input and batch_size is None:
+        raise ValueError("batch_size must be specified in case of multivariate setting.")
+
     dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc)
     datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
+     # in univariate, batch_size is a multiplier
+    if coords_as_input:
+        batch_size = batch_multiplier * datasets[0].num_cells
     training_dataloader = DataLoader(datasets[0], batch_size, shuffle=True)
     if len(datasets) > 2:
         validation_dataloader = DataLoader(datasets[1], batch_size, shuffle=False)
@@ -32,6 +43,21 @@ def get_wake_dataloaders(data_filepath: str,
         return training_dataloader, validation_dataloader, test_dataloader
     test_dataloader = DataLoader(datasets[1], batch_size, shuffle=False)
     return training_dataloader, test_dataloader
+
+def get_wake_datasets(data_filepath: str,
+                           consider_ws: bool,
+                           coords_as_input: bool,
+                           train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
+                           scaler=MinMaxScaler()):
+    dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc)
+    datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
+    train_x, train_y = datasets[0].x, datasets[0].y
+    if len(dataframes) > 2:
+        valid_x, valid_y = datasets[1].x, datasets[1].y
+        test_x, test_y = datasets[2].x, datasets[2].y
+        return (train_x, train_y), (valid_x, valid_y), (test_x, test_y)
+    test_x, test_y = datasets[1].x, datasets[1].y
+    return (train_x, train_y), (test_x, test_y)
 
 def __load_and_split_data(data_folder: str, consider_ws: bool,
         train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0) \
@@ -46,7 +72,8 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
     This method returns 2 or 3 dataframes representing respectively: train, (validation) and test sets
     """
     if consider_ws:
-        INPUT_VARIABLES.append(WS)
+        if WS not in INPUT_VARIABLES:
+            INPUT_VARIABLES.append(WS)
         return __load_and_split_data_by_speed(data_folder, test_perc, validation_perc)
     else:
         if WS in INPUT_VARIABLES:
@@ -80,7 +107,9 @@ def __load_and_split_data_by_speed(
     return train_df, test_df
 
 def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int]) -> pd.DataFrame:
-    return pd.concat([data_utils.load_netcfd(data_folder, wind_speed, include_ws_column=True)\
+    # by default, in case of more speeds, only a subpart of TI-CT combinations are considered
+    return pd.concat([data_utils.load_netcfd(data_folder, wind_speed, include_ws_column=True,
+                                             input_var_to_reduction_factor={'ti': 4, 'ct': 4})\
                       for wind_speed in wind_speeds])
 
 def __load_and_split_data_by_input_params(
@@ -137,13 +166,15 @@ class WakeDataset(Dataset):
         else:
             self.__prepare_multivariate()
         
+        self.num_cells = df[COORDS_VARIABLES].drop_duplicates().shape[0]
+        
         assert len(self.x) == len(self.y)
     
     def __prepare_univariate(self) -> None:
         #TODO change name and/or explain this approach
 
-        self.x = self.__df[INPUT_VARIABLES + COORDS_VARIABLES]
-        self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
+        self.unscaled_x = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
+        self.x = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_x))
         #TODO this scaler must be used to fit (and only to fit?) the test set
         self.y = self.__df[OUTPUT_VARIABLE].values
         self.y = torch.FloatTensor(self.y).unsqueeze(1)
@@ -168,6 +199,7 @@ class WakeDataset(Dataset):
         self.x = torch.stack(inputs, dim=0)
         if WS in INPUT_VARIABLES:
             # scaling only if wind speed is included, otherwise ct and ti have the same ranges
+            self.unscaled_x = self.x
             self.x = torch.FloatTensor(self.__scaler.fit_transform(self.x))
         self.y = torch.stack(outputs)
 
