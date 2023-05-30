@@ -155,8 +155,5 @@ cython_debug/
 
 .DS_Store
 /data
-jensen.yml
-test_floris_pywake.ipynb
 temp_code.ipynb
-
 .vscode/

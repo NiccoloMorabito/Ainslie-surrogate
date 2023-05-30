@@ -31,15 +31,23 @@ def cell_based_mae(wf1, wf2):
 
 class MetricsLogger:
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, logged_metrics_df: None) -> None:
         self.name = name
-        self.epoch_to_metrics = dict()
-        self.logged_metrics = set()
-        self.logging = True
-        print(f"Logging {name}", end="")
+        if logged_metrics_df is None:
+            self.epoch_to_metrics = dict()
+            self.logged_metrics = set()
+            self.__logging = True
+            print(f"Logging {name}", end="")
+        else:
+            self.epoch_to_metrics = dict()
+            for index, row in logged_metrics_df.iterrows():
+                self.epoch_to_metrics[index] = row.to_dict()
+            self.logged_metrics = set(self.epoch_to_metrics[0].keys())
+            self.df = logged_metrics_df
+            self.__logging = False
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:
-        self.logging = True
+        self.__logging = True
         if epoch_num not in self.epoch_to_metrics.keys():
             self.epoch_to_metrics[epoch_num] = dict()
             print(f"\nEpoch {epoch_num} ->", end="\t")
@@ -56,10 +64,10 @@ class MetricsLogger:
     def __stop(self) -> None:
         self.df = pd.DataFrame.from_dict(self.epoch_to_metrics, orient='index')
         self.df.index.name = 'epoch #'
-        self.logging = False
+        self.__logging = False
 
-    def plot_metrics_by_epoch(self, metric_names: list[str] = None, all_in_one: bool = True):
-        if self.logging:
+    def plot_metrics_by_epoch(self, metric_names: list[str] | None = None, all_in_one: bool = True):
+        if self.__logging:
             self.__stop()
 
         metrics_to_plot = self.logged_metrics if metric_names is None else metric_names
@@ -73,7 +81,7 @@ class MetricsLogger:
         if metric_name not in self.logged_metrics:
             warnings.warn(f"{metric_name} has not been logged yet, no plot for this metric has been generated")
             return
-        if self.logging:
+        if self.__logging:
             self.__stop()
         
         plt.plot(self.df.index, self.df[metric_name])
@@ -87,7 +95,7 @@ class MetricsLogger:
         missing_metrics = set(metric_names) - set(self.logged_metrics)
         assert len(missing_metrics) == 0, \
             f"The following metrics have not been logged yet: {', '.join(list(missing_metrics))}"
-        if self.logging:
+        if self.__logging:
             self.__stop()
         for metric_name in metric_names:
             plt.plot(self.df.index, self.df[metric_name], label=metric_name)
@@ -98,8 +106,8 @@ class MetricsLogger:
         plt.grid(True)
         plt.show()
 
-    def save_metrics(self, filepath: str = None) -> None:
-        if self.logging:
+    def save_metrics(self, filepath: str | None = None) -> None:
+        if self.__logging:
             self.__stop()
 
         if filepath is None:
@@ -113,3 +121,9 @@ class MetricsLogger:
             filepath = os.path.join(folder, filename)
         self.df.to_csv(filepath)
         print(f"Metrics exported in the following csv file: {filepath}")
+    
+    @staticmethod
+    def from_csv(filepath: str):
+        logs_df = pd.read_csv(filepath, header=0, index_col='epoch #')
+        metrics_logger = MetricsLogger(filepath.split("/")[1].split("_")[0], logs_df)
+        return metrics_logger

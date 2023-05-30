@@ -20,12 +20,8 @@ def plot_ct_curve(turbines: list[WindTurbine]) -> None:
     plt.show()
 
 # CONTOUR PLOTS
-# TODO write more meaninfgul default values for levels (i.e. the number of values of z that are shown)
-# for instance doing levels = np.linspace(-np.max(tensor), np.max(tensor), 100)
-# MORE LIKELY, choose a range of deficit (for instance) that is always valid and use that,
-# so that the plots can be better comparable
-# TODO think of using the log scale
-
+# TODO decide whether to use the same range of deficits for all the plots (like it's currently done in plot_maps)
+# TODO try using the log scale
 # TODO missing things to make the plot more readable (in case I need these plots for the thesis):
     # - start with the x also including the near-wake region, just without plotting anything there
     # - plot the turbine (see plot_windturbines() method in py_wake.flow_map.py)
