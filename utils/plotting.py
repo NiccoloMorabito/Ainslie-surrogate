@@ -7,7 +7,7 @@ from py_wake.wind_turbines import WindTurbine, WindTurbines
 DEFAULT_XLABEL = "Downwind distance [x/D]"
 DEFAULT_YLABEL = "Crosswind distance [y/D]"
 
-DEFICIT_LEVELS = np.linspace(0, 1, 100) # default levels for deficit, as the range is [0,1)
+DEFICIT_LEVELS = np.linspace(0, 1, 5000) # default levels for deficit, as the range is [0,1)
 
 def plot_ct_curve(turbines: list[WindTurbine]) -> None:
     plt.xlabel('Wind speed [m/s]')
@@ -27,7 +27,7 @@ def plot_ct_curve(turbines: list[WindTurbine]) -> None:
     # - plot the turbine (see plot_windturbines() method in py_wake.flow_map.py)
 
 def plot_deficit_map_from_df(df: pd.DataFrame, levels = DEFICIT_LEVELS, cmap: str ="Blues") -> None:
-    plot_map_from_df(df, zname="wind_deficit", zlabel="Wind deficit", levels=levels, cmap=cmap)
+    plot_map_from_df(df, zname="wind_deficit", zlabel="Wind Deficit", levels=levels, cmap=cmap)
 
 def plot_wake_map_from_df(df: pd.DataFrame, levels: int = 500, cmap: str ="Greens") -> None:
     plot_map_from_df(df, zname="WS_eff", zlabel="Effective wind speed [m/s]", levels=levels, cmap=cmap)
@@ -50,7 +50,7 @@ def plot_map_from_df(df: pd.DataFrame, zname: str, zlabel: str, levels, cmap: st
                    levels=levels, cmap=cmap)
 
 def plot_map(X, Y, wake_field,
-             ti: float, ct: float, ws: int | None = None, zlabel: str = "Wind deficit",
+             ti: float, ct: float, ws: int | None = None, zlabel: str = "Wind Deficit",
              levels = DEFICIT_LEVELS, cmap: str ='Blues') -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     if wake_field.dim() == 1:
@@ -60,51 +60,78 @@ def plot_map(X, Y, wake_field,
         title += f", WS={ws}"
     __plot_contour(X, Y, wake_field,
                    DEFAULT_XLABEL, DEFAULT_YLABEL, zlabel,
-                   title=title,
-                   levels=levels, cmap=cmap)
+                   title=title, levels=levels, cmap=cmap)
 
 def plot_maps(X, Y, original, predicted,
               ti: float, ct: float, ws: int | None = None,
-              zlabel: str = "Wind deficit", error_to_plot: str | None = None) -> None:
+              zlabel: str = "Wind Deficit", error_to_plot: str | None = None) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     assert original.shape == predicted.shape, "Original and predicted do not have the same shape"
     max_deficit = max(original.max(), predicted.max())
-    levels = np.linspace(0, max_deficit, 100)
-    plot_map(X, Y, original, ti, ct, ws, zlabel=f"Actual {zlabel}", levels=levels)
-    plot_map(X, Y, predicted, ti, ct, ws, zlabel=f"Predicted {zlabel}", levels=levels)
-    if error_to_plot is not None:
-        plot_error_map(X, Y, original, predicted, error_to_plot, ti=ti, ct=ct, ws=ws)
+    levels = np.linspace(0, max_deficit, 5000)
 
-def plot_error_map(X, Y, original_wake_field, predicted_wake_field,
-                   error_to_plot: str, ti: float, ct: float, ws: int | None = None) -> None:
+    if error_to_plot is None:
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with two subplots
+    else:
+        fig, axs = plt.subplots(1, 3, figsize=(15, 5))  # Create a figure with three subplots
+
+    plot_submap(X, Y, original, zlabel=f"Actual {zlabel}", levels=levels, ax=axs[0])
+    plot_submap(X, Y, predicted, zlabel=f"Predicted {zlabel}", levels=levels, ax=axs[1])
+    if error_to_plot is not None:
+        plot_error_submap(X, Y, original, predicted, error_to_plot, ax=axs[2])
+    
+    suptitle = f"Wind Deficit Contour Maps for TI={ti:.2f}, CT={ct:.2f}"
+    if ws is not None:
+        suptitle += f", WS={ws}"
+    fig.suptitle(suptitle, fontsize=16) # Main title for all the images
+    fig.tight_layout()  # Adjust the spacing between subplots
+    plt.show()
+
+def plot_submap(X, Y, wake_field, zlabel: str = "Wind Deficit",
+             levels = DEFICIT_LEVELS, cmap: str ='Blues', ax = None) -> None:
+    assert X.shape == Y.shape, "X and Y grids have not the same shape"
+    if wake_field.dim() == 1:
+        wake_field = wake_field.reshape(X.shape)
+    __plot_contour(X, Y, wake_field,
+                   DEFAULT_XLABEL, DEFAULT_YLABEL, zlabel,
+                   title=zlabel,
+                   levels=levels, cmap=cmap, ax=ax)
+
+def plot_error_submap(X, Y, original_wake_field, predicted_wake_field,
+                   error_to_plot: str, ax = None) -> None:
     #TODO standardize the levels for a better comparison?
     #TODO standardize torch and numpy use
-    if error_to_plot=='signed':
+    if error_to_plot.lower()=='signed':
         diff_wake_field = original_wake_field - predicted_wake_field
         cmap = 'coolwarm'
-        levels = np.linspace(-torch.max(diff_wake_field), torch.max(diff_wake_field), 100) #TODO
-    elif error_to_plot=='absolute':
+        levels = np.linspace(-torch.max(diff_wake_field), torch.max(diff_wake_field), 5000) #TODO
+    elif error_to_plot.lower()=='absolute':
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field)
         cmap = 'Reds'
-        levels = np.linspace(0, torch.max(diff_wake_field), 100)
-    elif error_to_plot=='relative':
+        levels = np.linspace(0, torch.max(diff_wake_field), 5000)
+    elif error_to_plot.lower()=='relative':
         epsilon = 1e-10
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field) /\
              np.abs(predicted_wake_field + epsilon)
         cmap = 'Reds'
-        levels = np.linspace(0, torch.max(diff_wake_field), 100)
+        levels = np.linspace(0, torch.max(diff_wake_field), 5000)
     else:
         raise ValueError(f"Invalid type_of_error: {error_to_plot}. " +\
                          "Expected 'signed', 'absolute', or 'relative'.")
-    zlabel = f"{error_to_plot} deficit error"
-    plot_map(X, Y, diff_wake_field, ti, ct, ws, zlabel, levels, cmap)
+    zlabel = f"{error_to_plot.capitalize()} Deficit Error"
+    plot_submap(X, Y, diff_wake_field, zlabel, levels, cmap, ax)
 
 def __plot_contour(X, Y, Z,
-                   xlabel: str, ylabel: str, zlabel: str, title: str, levels, cmap: str) -> None:
-    ax = plt.gca()
+                   xlabel: str, ylabel: str, zlabel: str, title: str,
+                   levels, cmap: str, ax = None) -> None:
+    show=False
+    if ax is None:
+        ax = plt.gca()
+        show = True
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
+    ax.set_title(title)
     c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
     plt.colorbar(c, label=zlabel, ax=ax)
-    plt.title(title)
-    plt.show()
+    if show:
+        plt.show()
