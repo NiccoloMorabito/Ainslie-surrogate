@@ -31,19 +31,19 @@ def cell_based_mae(wf1, wf2):
 
 class MetricsLogger:
 
-    def __init__(self, name: str, logged_metrics_df: None) -> None:
+    def __init__(self, name: str, df_metrics: pd.DataFrame | None = None) -> None:
         self.name = name
-        if logged_metrics_df is None:
+        if df_metrics is None:
             self.epoch_to_metrics = dict()
             self.logged_metrics = set()
             self.__logging = True
             print(f"Logging {name}", end="")
         else:
             self.epoch_to_metrics = dict()
-            for index, row in logged_metrics_df.iterrows():
+            for index, row in df_metrics.iterrows():
                 self.epoch_to_metrics[index] = row.to_dict()
             self.logged_metrics = set(self.epoch_to_metrics[0].keys())
-            self.df = logged_metrics_df
+            self.df = df_metrics
             self.__logging = False
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:

@@ -42,6 +42,12 @@ def get_discretized_grid(diameter: int,
     y_range = np.arange(diameter*y_start_factor, diameter*y_end_factor, diameter*grid_step_factor)
     return HorizontalGrid(x = x_range, y = y_range)
 
+def get_grid_shape(x_start_factor: int, x_end_factor: int,
+                  y_start_factor: int, y_end_factor: int,
+                  grid_step_factor: float) -> tuple[int, int]:
+    return int((x_end_factor - x_start_factor) / grid_step_factor),\
+        int((y_end_factor - y_start_factor) / grid_step_factor)
+
 # using xarray netcdf for storing in a more efficient way (including compression)
 def generate_wake_dataset(model, wind_speed: float, wind_direction: float,
                             wind_diameter: int, turbine_xs: list[int], turbine_ys: list[int],
