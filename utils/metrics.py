@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 class RMSELoss(nn.Module):
-    def __init__(self, eps=1e-6):
+    def __init__(self, eps=1e-12):
         super().__init__()
         self.mse = nn.MSELoss()
         self.eps = eps
