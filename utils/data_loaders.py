@@ -103,17 +103,18 @@ class WakeDataset(Dataset):
         unscaled_inputs = torch.Tensor(self.unscaled_inputs[idx:idx+self.num_cells])
         if callable(model): # PyTorch model
             predictions = model(inputs)
+            # reshape outputs and predictions
+            wake_field = outputs.view(-1).reshape(self.X_grid.shape)
+            predicted_wake_field = predictions.view(-1).reshape(self.X_grid.shape)
         elif hasattr(model, 'predict'):  # sklearn model
             predictions = model.predict(inputs)
+            wake_field = outputs.reshape(self.X_grid.shape)
+            predicted_wake_field = torch.Tensor(predictions).reshape(self.X_grid.shape)
         else:
             raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
 
         ti, ct = unscaled_inputs[0, 0], unscaled_inputs[0, 1]
         ws = unscaled_inputs[:, 4] if WS in INPUT_VARIABLES else None
-        
-        # reshape outputs and predictions
-        wake_field = outputs.view(-1).reshape(self.X_grid.shape)
-        predicted_wake_field = predictions.view(-1).reshape(self.X_grid.shape)
 
         return ti, ct, ws, wake_field, predicted_wake_field
 
