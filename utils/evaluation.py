@@ -46,7 +46,6 @@ def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
     preds = model.predict(test_x)
     end_time = time.time()
     prediction_time = (end_time-start_time) / test_x.shape[0]
-    print((end_time-start_time),test_x.shape[0], prediction_time )
     return preds, prediction_time
 
 def __compute_other_metrics(outputs, predictions) -> dict[str, float]:

@@ -17,6 +17,124 @@ COORDS_VARIABLES = ["x/D", "y/D"]
     # - univariate and multivariate as consequence of coords_as_input
 #TODO fix the INPUT_VARIABLES list
 
+class WakeDataset(Dataset):
+#TODO make "consider ws" something standard and clear (not "WS in INPUT_VARIABLES")
+#TODO create two subclasses for univariate and multivariate:
+# so that the different methods can be distinguished (preparation and get_params_for_plotting)
+# do maybe a different indexing for univariate, at least an additional one doing:
+#   self.unscaled_inputs[index:index+self.num_cells]
+#TODO there is confusion between x and y (i.e. input and output of the model)
+# and x and y as coordinates (in input) or the meshgrids X and Y
+    def __init__(
+            self, df: pd.DataFrame,
+            coords_as_input: bool,
+            scaler = MinMaxScaler()
+        ) -> None:
+        super().__init__()
+        self.__df = df
+        assert set(INPUT_VARIABLES) <= set(self.__df.columns) and \
+            {OUTPUT_VARIABLE} <= set(self.__df.columns)
+        self.__scaler = scaler
+        self.num_cells = df[COORDS_VARIABLES].drop_duplicates().shape[0]
+
+        if coords_as_input:
+            self.__prepare_univariate()
+        else:
+            self.__prepare_multivariate()
+                
+        assert len(self.inputs) == len(self.outputs)
+    
+    def __prepare_univariate(self) -> None:
+        #TODO change name and/or explain this approach
+
+        self.unscaled_inputs = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
+        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_inputs))
+        #TODO this scaler must be used to fit (and only to fit?) the test set
+        self.outputs = self.__df[OUTPUT_VARIABLE].values
+        self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
+
+        # meshgrids
+        Xs, Ys = self.unscaled_inputs[0:self.num_cells, 2], self.unscaled_inputs[0:self.num_cells, 3]
+        trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
+        self.X_grid = Xs.reshape(trasp_shape)
+        self.Y_grid = Ys.reshape(trasp_shape)
+
+    def __prepare_multivariate(self) -> None:
+        #TODO change name and/or explain this approach
+
+        # Group by input features and create input and output tensors
+        inputs = list()
+        outputs = list()
+
+        for group, data in self.__df.groupby(INPUT_VARIABLES):
+            input_tensor = torch.FloatTensor(group)
+            inputs.append(input_tensor)
+
+            output_tensor = data.pivot(index='y/D', columns='x/D',
+                                       values=OUTPUT_VARIABLE).values # 2d output tensor with shape: (num_unique_y_values, num_unique_x_values)
+            output_tensor = output_tensor.reshape(-1) #1d output tensor
+            output_tensor = torch.FloatTensor(output_tensor)
+            outputs.append(output_tensor)
+
+        self.inputs = torch.stack(inputs, dim=0)
+        if WS in INPUT_VARIABLES:
+            # scaling only if wind speed is included, otherwise ct and ti have the same ranges
+            self.unscaled_inputs = self.inputs
+            self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.inputs))
+        self.outputs = torch.stack(outputs)
+
+        # meshgrids
+        Xs, Ys = self.__df[COORDS_VARIABLES[0]].values[0:self.num_cells], \
+            self.__df[COORDS_VARIABLES[1]].values[0:self.num_cells] #TODO clean
+        trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
+        self.X_grid = Xs.reshape(trasp_shape).T
+        self.Y_grid = Ys.reshape(trasp_shape).T
+    
+    def __len__(self) -> int:
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
+
+    #TODO think of plotting directly (since it takes the model, it may be predict_and_plot)
+    def get_parameters_for_plotting_univariate(self, model, field_idx: int) -> tuple:
+        idx = field_idx*self.num_cells
+        inputs, outputs = self[idx:idx+self.num_cells]
+        unscaled_inputs = torch.Tensor(self.unscaled_inputs[idx:idx+self.num_cells])
+        if callable(model): # PyTorch model
+            predictions = model(inputs)
+        elif hasattr(model, 'predict'):  # sklearn model
+            predictions = model.predict(inputs)
+        else:
+            raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
+
+        ti, ct = unscaled_inputs[0, 0], unscaled_inputs[0, 1]
+        ws = unscaled_inputs[:, 4] if WS in INPUT_VARIABLES else None
+        
+        # reshape outputs and predictions
+        wake_field = outputs.view(-1).reshape(self.X_grid.shape)
+        predicted_wake_field = predictions.view(-1).reshape(self.X_grid.shape)
+
+        return ti, ct, ws, wake_field, predicted_wake_field
+
+    def get_parameters_for_plotting_multivariate(self, model, idx: int) -> tuple:
+        input, wake_field = self.inputs[idx], self.outputs[idx]
+        if callable(model): # PyTorch model
+            predicted_wake_field = model(input)
+        elif hasattr(model, 'predict'):  # sklearn model
+            predicted_wake_field = model.predict(input.reshape(1, -1))
+        else:
+            raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
+
+        if WS in INPUT_VARIABLES:
+            ti, ct, ws = self.unscaled_inputs[idx]
+        else:
+            ti, ct = input
+            ws = None
+        
+        return ti, ct, ws, wake_field, predicted_wake_field
+
+
 def get_wake_dataloaders(data_filepath: str,
                          consider_ws: bool,
                          coords_as_input: bool,
@@ -49,16 +167,9 @@ def get_wake_datasets(data_filepath: str,
                            consider_ws: bool,
                            coords_as_input: bool,
                            train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
-                           scaler=MinMaxScaler()):
+                           scaler=MinMaxScaler()) -> list[WakeDataset]:
     dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc)
-    datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
-    train_x, train_y = datasets[0].inputs, datasets[0].outputs
-    if len(dataframes) > 2:
-        valid_x, valid_y = datasets[1].inputs, datasets[1].outputs
-        test_x, test_y = datasets[2].inputs, datasets[2].outputs
-        return (train_x, train_y), (valid_x, valid_y), (test_x, test_y)
-    test_x, test_y = datasets[1].inputs, datasets[1].outputs
-    return (train_x, train_y), (test_x, test_y)
+    return __dataframes_to_datasets(dataframes, coords_as_input, scaler)
 
 def __load_and_split_data(data_folder: str, consider_ws: bool,
         train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0) \
@@ -148,113 +259,3 @@ def __dataframes_to_datasets(dfs,
                            coords_as_input: bool,
                            scaler):
     return [WakeDataset(df, coords_as_input, scaler) for df in dfs]
-
-class WakeDataset(Dataset):
-#TODO make "consider ws" something standard and clear (not "WS in INPUT_VARIABLES")
-#TODO create two subclasses for univariate and multivariate:
-# so that the different methods can be distinguished (preparation and get_params_for_plotting)
-# do maybe a different indexing for univariate, at least an additional one doing:
-#   self.unscaled_x[index:index+self.num_cells]
-#TODO there is confusion between x and y (i.e. input and output of the model)
-# and x and y as coordinates (in input) or the meshgrids X and Y
-    def __init__(
-            self, df: pd.DataFrame,
-            coords_as_input: bool,
-            scaler = MinMaxScaler()
-        ) -> None:
-        super().__init__()
-        self.__df = df
-        assert set(INPUT_VARIABLES) <= set(self.__df.columns) and \
-            {OUTPUT_VARIABLE} <= set(self.__df.columns)
-        self.__scaler = scaler
-        self.num_cells = df[COORDS_VARIABLES].drop_duplicates().shape[0]
-
-        if coords_as_input:
-            self.__prepare_univariate()
-        else:
-            self.__prepare_multivariate()
-                
-        assert len(self.inputs) == len(self.outputs)
-    
-    def __prepare_univariate(self) -> None:
-        #TODO change name and/or explain this approach
-
-        self.unscaled_x = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
-        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_x))
-        #TODO this scaler must be used to fit (and only to fit?) the test set
-        self.outputs = self.__df[OUTPUT_VARIABLE].values
-        self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
-
-        # meshgrids
-        Xs, Ys = self.unscaled_x[0:self.num_cells, 2], self.unscaled_x[0:self.num_cells, 3]
-        trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
-        self.X_grid = Xs.reshape(trasp_shape).T
-        self.Y_grid = Ys.reshape(trasp_shape).T
-
-
-    def __prepare_multivariate(self) -> None:
-        #TODO change name and/or explain this approach
-
-        # Group by input features and create input and output tensors
-        inputs = list()
-        outputs = list()
-
-        for group, data in self.__df.groupby(INPUT_VARIABLES):
-            input_tensor = torch.FloatTensor(group)
-            inputs.append(input_tensor)
-
-            output_tensor = data.pivot(index='y/D', columns='x/D',
-                                       values=OUTPUT_VARIABLE).values # 2d output tensor with shape: (num_unique_y_values, num_unique_x_values)
-            output_tensor = output_tensor.reshape(-1) #1d output tensor
-            output_tensor = torch.FloatTensor(output_tensor)
-            outputs.append(output_tensor)
-
-        self.inputs = torch.stack(inputs, dim=0)
-        if WS in INPUT_VARIABLES:
-            # scaling only if wind speed is included, otherwise ct and ti have the same ranges
-            self.unscaled_x = self.inputs
-            self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.inputs))
-        self.outputs = torch.stack(outputs)
-
-        # meshgrids
-        Xs, Ys = self.__df[COORDS_VARIABLES[0]].values[0:self.num_cells], \
-            self.__df[COORDS_VARIABLES[1]].values[0:self.num_cells] #TODO clean
-        trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
-        self.X_grid = Xs.reshape(trasp_shape).T
-        self.Y_grid = Ys.reshape(trasp_shape).T
-    
-    def __len__(self) -> int:
-        return len(self.inputs)
-
-    def __getitem__(self, idx):
-        return self.inputs[idx], self.outputs[idx]
-
-
-    #TODO standardize these two methods in the returned output 
-    # think of plotting directly (since it takes the model, it may be predict_and_plot)
-    # -> find a different way to get X_grid and Y_grid
-    def get_parameters_for_plotting_univariate(self, model, field_idx: int) -> tuple:
-        inputs, outputs = self[field_idx:field_idx+self.num_cells]
-        unscaled_inputs = torch.Tensor(self.unscaled_x[field_idx:field_idx+self.num_cells])
-        predictions = model(inputs)
-
-        ti, ct = unscaled_inputs[0, 0], unscaled_inputs[0, 1]
-        ws = unscaled_inputs[:, 4] if WS in INPUT_VARIABLES else None
-        
-        # reshape outputs and predictions
-        wake_field = outputs.view(-1).reshape(self.X_grid.shape).T
-        predicted_wake_field = predictions.view(-1).reshape(self.X_grid.shape).T
-
-        return ti, ct, ws, wake_field, predicted_wake_field
-
-    def get_parameters_for_plotting_multivariate(self, model, idx: int) -> tuple:
-        input, wake_field = self.inputs[idx], self.outputs[idx]
-        predicted_wake_field = model(input)
-
-        if WS in INPUT_VARIABLES:
-            ti, ct, ws = self.unscaled_x[idx]
-        else:
-            ti, ct = input
-            ws = None
-        
-        return ti, ct, ws, wake_field, predicted_wake_field
