@@ -122,7 +122,7 @@ class WakeDataset(Dataset):
         if callable(model): # PyTorch model
             predicted_wake_field = model(input)
         elif hasattr(model, 'predict'):  # sklearn model
-            predicted_wake_field = model.predict(input.reshape(1, -1))
+            predicted_wake_field = torch.tensor(model.predict(input.reshape(1, -1)).reshape(-1))
         else:
             raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
 
@@ -133,7 +133,6 @@ class WakeDataset(Dataset):
             ws = None
         
         return ti, ct, ws, wake_field, predicted_wake_field
-
 
 def get_wake_dataloaders(data_filepath: str,
                          consider_ws: bool,
