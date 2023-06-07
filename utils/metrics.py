@@ -5,6 +5,7 @@ import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 
+#TODO remove v
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-12):
         super().__init__()
@@ -28,6 +29,7 @@ def cell_based_mae(wf1, wf2):
     # Mean absolute error = L1
     absolute_diff = np.abs(wf1 - wf2)
     return np.mean(absolute_diff, axis=1)
+#TODO remove ^
 
 class MetricsLogger:
 
@@ -47,6 +49,9 @@ class MetricsLogger:
             self.__logging = False
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:
+        # intermediate savings (TODO the logging boolean in this case doesn't make sense)
+        if epoch_num not in self.epoch_to_metrics.keys() and epoch_num%50==0:
+            self.save_metrics()
         self.__logging = True
         if epoch_num not in self.epoch_to_metrics.keys():
             self.epoch_to_metrics[epoch_num] = dict()
@@ -79,7 +84,8 @@ class MetricsLogger:
     
     def __plot_single_metric_by_epoch(self, metric_name: str):
         if metric_name not in self.logged_metrics:
-            warnings.warn(f"{metric_name} has not been logged yet, no plot for this metric has been generated")
+            warnings.warn(f"{metric_name} has not been logged yet: " +\
+                          "no plot for this metric has been generated")
             return
         if self.__logging:
             self.__stop()
@@ -105,20 +111,24 @@ class MetricsLogger:
         plt.legend()
         plt.grid(True)
         plt.show()
+    
+    def __get_filepath(self):
+        import datetime, os, re
+        folder = "logged_metrics/"
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+        name = re.sub(r'[^a-zA-Z0-9 -_]', '', self.name).replace(" ", "-")
+        filename = f"{name}_{timestamp}.csv"
+        return os.path.join(folder, filename)
 
     def save_metrics(self, filepath: str | None = None) -> None:
         if self.__logging:
             self.__stop()
 
         if filepath is None:
-            import datetime, os, re
-            folder = "logged_metrics/"
-            if not os.path.exists(folder):
-                os.makedirs(folder)
-            timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
-            name = re.sub(r'[^a-zA-Z0-9 -_]', '', self.name).replace(" ", "-")
-            filename = f"{name}_{timestamp}.csv"
-            filepath = os.path.join(folder, filename)
+            filepath = self.__get_filepath()
+        
         self.df.to_csv(filepath)
         print(f"Metrics exported in the following csv file: {filepath}")
     
