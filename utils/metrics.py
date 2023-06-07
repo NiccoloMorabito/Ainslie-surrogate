@@ -4,6 +4,10 @@ import torch
 import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
+import datetime
+import os
+import re
+
 
 #TODO remove v
 class RMSELoss(nn.Module):
@@ -47,11 +51,12 @@ class MetricsLogger:
             self.logged_metrics = set(self.epoch_to_metrics[0].keys())
             self.df = df_metrics
             self.__logging = False
+        self.timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:
         # intermediate savings (TODO the logging boolean in this case doesn't make sense)
-        if epoch_num not in self.epoch_to_metrics.keys() and epoch_num%50==0:
-            self.save_metrics()
+        if epoch_num not in self.epoch_to_metrics.keys() and epoch_num%50==0 and epoch_num>0:
+            self.__intermediate_save_metrics()
         self.__logging = True
         if epoch_num not in self.epoch_to_metrics.keys():
             self.epoch_to_metrics[epoch_num] = dict()
@@ -113,14 +118,18 @@ class MetricsLogger:
         plt.show()
     
     def __get_filepath(self):
-        import datetime, os, re
         folder = "logged_metrics/"
         if not os.path.exists(folder):
             os.makedirs(folder)
-        timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
         name = re.sub(r'[^a-zA-Z0-9 -_]', '', self.name).replace(" ", "-")
-        filename = f"{name}_{timestamp}.csv"
+        filename = f"{name}_{self.timestamp}.csv"
         return os.path.join(folder, filename)
+    
+    def __intermediate_save_metrics(self) -> None:
+        if self.__logging:
+            self.__stop()
+        filepath = self.__get_filepath()
+        self.df.to_csv(filepath)
 
     def save_metrics(self, filepath: str | None = None) -> None:
         if self.__logging:
