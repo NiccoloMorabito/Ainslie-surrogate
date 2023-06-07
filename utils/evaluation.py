@@ -50,7 +50,6 @@ def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
 
 def __compute_other_metrics(outputs, predictions) -> dict[str, float]:
     metric_to_value = dict()
-    print("Test results")
     for metric in METRICS:
         metric_to_value[metric.__name__] = metric(outputs, predictions)
         print(f"{metric.__name__}={metric(outputs, predictions)}")
@@ -59,9 +58,11 @@ def __compute_other_metrics(outputs, predictions) -> dict[str, float]:
 def test_pytorch_model(model, test_dataloader,
                                     model_description: str, save_results: bool) -> None:
     predictions, outputs, prediction_time = __get_predictions_outputs_time(model, test_dataloader)
+    print("Test results for " + model_description)
     metrics = __compute_other_metrics(outputs, predictions)
     metrics[MODEL_DESC] = model_description
     metrics[PREDICTION_TIME] = prediction_time
+    print(f"Prediction time={prediction_time}s")
     metrics[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     if save_results:

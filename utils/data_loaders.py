@@ -46,7 +46,6 @@ class WakeDataset(Dataset):
     
     def __prepare_univariate(self) -> None:
         #TODO change name and/or explain this approach
-
         self.unscaled_inputs = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
         self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_inputs))
         #TODO this scaler must be used to fit (and only to fit?) the test set
@@ -54,7 +53,7 @@ class WakeDataset(Dataset):
         self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
 
         # meshgrids
-        Xs, Ys = self.unscaled_inputs[0:self.num_cells, 2], self.unscaled_inputs[0:self.num_cells, 3]
+        Xs, Ys = self.unscaled_inputs[0:self.num_cells, -2], self.unscaled_inputs[0:self.num_cells, -1]
         trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
         self.X_grid = Xs.reshape(trasp_shape)
         self.Y_grid = Ys.reshape(trasp_shape)
@@ -76,19 +75,21 @@ class WakeDataset(Dataset):
             output_tensor = torch.FloatTensor(output_tensor)
             outputs.append(output_tensor)
 
+            # meshgrids
+            if not hasattr(self, 'X_grid') or not hasattr(self, 'Y_grid'):
+                Xs = data[COORDS_VARIABLES[0]].values
+                Ys = data[COORDS_VARIABLES[1]].values
+                trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
+                self.X_grid = Xs.reshape(trasp_shape).T
+                self.Y_grid = Ys.reshape(trasp_shape).T
+
         self.inputs = torch.stack(inputs, dim=0)
         if WS in INPUT_VARIABLES:
             # scaling only if wind speed is included, otherwise ct and ti have the same ranges
+            #TODO maybe I can scale by default
             self.unscaled_inputs = self.inputs
             self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.inputs))
         self.outputs = torch.stack(outputs)
-
-        # meshgrids
-        Xs, Ys = self.__df[COORDS_VARIABLES[0]].values[0:self.num_cells], \
-            self.__df[COORDS_VARIABLES[1]].values[0:self.num_cells] #TODO clean
-        trasp_shape = len(np.unique(Xs)), len(np.unique(Ys))
-        self.X_grid = Xs.reshape(trasp_shape).T
-        self.Y_grid = Ys.reshape(trasp_shape).T
     
     def __len__(self) -> int:
         return len(self.inputs)
@@ -113,8 +114,8 @@ class WakeDataset(Dataset):
         else:
             raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
 
-        ti, ct = unscaled_inputs[0, 0], unscaled_inputs[0, 1]
-        ws = unscaled_inputs[:, 4] if WS in INPUT_VARIABLES else None
+        ti, ct = unscaled_inputs[0, 0].item(), unscaled_inputs[0, 1].item()
+        ws = unscaled_inputs[0, 2].item() if WS in INPUT_VARIABLES else None
 
         return ti, ct, ws, wake_field, predicted_wake_field
 
