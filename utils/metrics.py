@@ -7,8 +7,9 @@ import pandas as pd
 import datetime
 import os
 import re
+import time
 
-
+"""
 #TODO remove v
 class RMSELoss(nn.Module):
     def __init__(self, eps=1e-12):
@@ -34,45 +35,90 @@ def cell_based_mae(wf1, wf2):
     absolute_diff = np.abs(wf1 - wf2)
     return np.mean(absolute_diff, axis=1)
 #TODO remove ^
+"""
+
+class EpochTimer:
+    def __init__(self, epoch_num: int):
+        self.__epoch_num = epoch_num
+        self.__start_time = time.time()
+    
+    def get_epoch_num(self) -> int:
+        return self.__epoch_num
+
+    def stop(self) -> float:
+        end_time = time.time()
+        return int(end_time - self.__start_time)
+
+EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
 class MetricsLogger:
 
     def __init__(self, name: str, df_metrics: pd.DataFrame | None = None) -> None:
         self.name = name
         if df_metrics is None:
-            self.epoch_to_metrics = dict()
-            self.logged_metrics = set()
+            self.__epoch_to_metrics = dict()
+            self.__logged_metrics = set()
             self.__logging = True
             print(f"Logging {name}", end="")
         else:
-            self.epoch_to_metrics = dict()
+            self.__epoch_to_metrics = dict()
             for index, row in df_metrics.iterrows():
-                self.epoch_to_metrics[index] = row.to_dict()
-            self.logged_metrics = set(self.epoch_to_metrics[0].keys())
+                self.__epoch_to_metrics[index] = row.to_dict()
+            self.__logged_metrics = set(self.__epoch_to_metrics[0].keys())
             self.df = df_metrics
             self.__logging = False
+        self.__epoch_timer = None
         self.timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:
         # intermediate savings (TODO the logging boolean in this case doesn't make sense)
-        if epoch_num not in self.epoch_to_metrics.keys() and epoch_num%50==0 and epoch_num>0:
-            self.__intermediate_save_metrics()
+        if epoch_num not in self.__epoch_to_metrics.keys() and epoch_num%50==0 and epoch_num>0:
+            self.__save_intermediate_metrics()
         self.__logging = True
-        if epoch_num not in self.epoch_to_metrics.keys():
-            self.epoch_to_metrics[epoch_num] = dict()
+        if epoch_num not in self.__epoch_to_metrics.keys():            
+            self.__epoch_to_metrics[epoch_num] = dict()
             print(f"\nEpoch {epoch_num} ->", end="\t")
-            if self.logged_metrics and metric_name not in self.logged_metrics:
+            if self.__logged_metrics and metric_name not in self.__logged_metrics:
                 warnings.warn(
                     f"The metric '{metric_name}' has not been registered in the previous epochs.")
-        self.epoch_to_metrics[epoch_num][metric_name] = metric_value
-        self.logged_metrics.add(metric_name)
+
+            # measure epoch time
+            self.__start_epoch_timer(epoch_num)
+        
+        self.__epoch_to_metrics[epoch_num][metric_name] = metric_value
+        self.__logged_metrics.add(metric_name)
         print(f"{metric_name}={metric_value}", end="\t")
     
+    def __start_epoch_timer(self, epoch_num: int) -> None:
+        self.__check_previous_epochs_time(epoch_num) #TODO
+        if self.__epoch_timer is not None:
+            self.__end_epoch_timer()
+        self.__epoch_timer = EpochTimer(epoch_num)
+    
+    def __check_previous_epochs_time(self, epoch_num: int) -> None:
+        #TODO this method should be deleted at some point (just to check for bugs currently)
+        if epoch_num < 1:
+            return
+        for i in range(epoch_num-1):
+            if EPOCH_TIME_LABEL not in self.__epoch_to_metrics[i]:
+                warnings.warn(
+                    f"The epoch {i} has not been correctly stopped while executing epoch {epoch_num}")
+    
+    def __end_epoch_timer(self) -> None:
+        if self.__epoch_timer is None:
+            warnings.warn(f"Attempting to stop a non-initialized timer")
+            return
+        epoch_num = self.__epoch_timer.get_epoch_num()
+        epoch_time = self.__epoch_timer.stop()
+        self.__epoch_timer = None
+        self.__epoch_to_metrics[epoch_num][EPOCH_TIME_LABEL] = epoch_time
+    
     def get_logged_metric_names(self) -> list[str]:
-        return list(self.logged_metrics)
+        return list(self.__logged_metrics)
     
     def __stop(self) -> None:
-        self.df = pd.DataFrame.from_dict(self.epoch_to_metrics, orient='index')
+        self.__end_epoch_timer()
+        self.df = pd.DataFrame.from_dict(self.__epoch_to_metrics, orient='index')
         self.df.index.name = 'epoch #'
         self.__logging = False
 
@@ -80,7 +126,7 @@ class MetricsLogger:
         if self.__logging:
             self.__stop()
 
-        metrics_to_plot = self.logged_metrics if metric_names is None else metric_names
+        metrics_to_plot = self.__logged_metrics if metric_names is None else metric_names
         if all_in_one:
             self.__plot_many_metrics_by_epoch(metrics_to_plot)
         else:
@@ -88,7 +134,7 @@ class MetricsLogger:
                 self.__plot_single_metric_by_epoch(metric_name)
     
     def __plot_single_metric_by_epoch(self, metric_name: str):
-        if metric_name not in self.logged_metrics:
+        if metric_name not in self.__logged_metrics:
             warnings.warn(f"{metric_name} has not been logged yet: " +\
                           "no plot for this metric has been generated")
             return
@@ -103,7 +149,7 @@ class MetricsLogger:
         plt.show()
     
     def __plot_many_metrics_by_epoch(self, metric_names):
-        missing_metrics = set(metric_names) - set(self.logged_metrics)
+        missing_metrics = set(metric_names) - set(self.__logged_metrics)
         assert len(missing_metrics) == 0, \
             f"The following metrics have not been logged yet: {', '.join(list(missing_metrics))}"
         if self.__logging:
@@ -125,7 +171,7 @@ class MetricsLogger:
         filename = f"{name}_{self.timestamp}.csv"
         return os.path.join(folder, filename)
     
-    def __intermediate_save_metrics(self) -> None:
+    def __save_intermediate_metrics(self) -> None:
         if self.__logging:
             self.__stop()
         filepath = self.__get_filepath()
