@@ -81,15 +81,15 @@ class MetricsLogger:
             epoch_num%self.automatic_save_after==0 and epoch_num>0:
             self.__save_intermediate_metrics()
         self.__logging = True
-        if epoch_num not in self.__epoch_to_metrics.keys():            
+        if epoch_num not in self.__epoch_to_metrics.keys():
+            # measure epoch time
+            self.__start_epoch_timer(epoch_num)
+
             self.__epoch_to_metrics[epoch_num] = dict()
             print(f"\nEpoch {epoch_num} ->", end="\t")
             if self.__logged_metrics and metric_name not in self.__logged_metrics:
                 warnings.warn(
                     f"The metric '{metric_name}' has not been registered in the previous epochs.")
-
-            # measure epoch time
-            self.__start_epoch_timer(epoch_num)
         
         self.__epoch_to_metrics[epoch_num][metric_name] = metric_value
         self.__logged_metrics.add(metric_name)
@@ -116,6 +116,7 @@ class MetricsLogger:
             return
         epoch_num = self.__epoch_timer.get_epoch_num()
         epoch_time = self.__epoch_timer.stop()
+        print(f"{EPOCH_TIME_LABEL}={epoch_time}", end="\t")
         self.__epoch_timer = None
         self.__epoch_to_metrics[epoch_num][EPOCH_TIME_LABEL] = epoch_time
     
@@ -194,7 +195,8 @@ class MetricsLogger:
         print(f"Metrics exported in the following csv file: {filepath}")
     
     def get_training_time(self, according_to: str = 'Validation loss') -> int:
-        """Overall training time of the best model"""
+        """Overall training time of the best model
+        (i.e. overall time required for the best model to be obtained)"""
         if according_to not in self.__logged_metrics:
             raise ValueError(f"The metric {according_to} has not been logged")
 
