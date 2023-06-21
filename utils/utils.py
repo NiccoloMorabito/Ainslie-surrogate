@@ -41,6 +41,38 @@ def random_split_list(input_list : list, perc_part2: float, perc_part3: float = 
         return part1, part2, part3
     return part1, part2
 
+def ordered_split_list(input_list: list, perc_part2: float, perc_part3: float = 0) -> tuple:
+    """
+    Splits the input_list in 2 or 3 parts while preserving the order according to the passed percentages
+    """
+    assert type(input_list) == list and len(input_list) > 1, "Invalid input list"
+    assert 0 < perc_part2 < 1, "Invalid percentage for the second part"
+    assert 0 <= perc_part3 < 1, "Invalid percentage for the third part"
+    total_size = len(input_list)
+    input_list = sorted(input_list)
+
+    part1_size = int(total_size * (1 - perc_part2 - perc_part3))
+    part1 = input_list[:part1_size]
+
+    part3 = []
+    if perc_part3 > 0:
+        part3_size = int(total_size * perc_part3)
+        part3_start = part1_size
+        part3_end = part3_start + part3_size
+        part3 = input_list[part3_start:part3_end]
+
+    part2_start = part1_size + len(part3)
+    part2 = input_list[part2_start:]
+
+    assert len(part1) + len(part2) + len(part3) == total_size
+    assert set(part1).isdisjoint(set(part3)) \
+        and set(part3).isdisjoint(set(part2)) \
+        and set(part1).isdisjoint(set(part2))
+
+    if len(part3) > 0:
+        return part1, part3, part2
+    return part1, part2
+
 def get_wake_coordinates_from_discr_factors(
         x_start_factor, x_end_factor, y_start_factor, y_end_factor, grid_factor):
     x_range = np.arange(x_start_factor, x_end_factor, grid_factor)
