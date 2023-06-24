@@ -272,7 +272,8 @@ def __load_and_split_data_by_input_params(
     Function to split the data in training, test and possibly validation sets
     according to thrust coefficient and turbulence intensity
     """
-    df = data_utils.load_netcfd(data_folder, wind_speed=12, include_ws_column=True) #TODO random value here
+    random_ws = 12 #TODO random value here
+    df = data_utils.load_netcfd(data_folder, wind_speed=random_ws, include_ws_column=True)
     input_combs = df[INPUT_VARIABLES].drop_duplicates()
 
     # Sampling from input combinations

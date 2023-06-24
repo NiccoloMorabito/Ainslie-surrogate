@@ -119,6 +119,9 @@ def plot_error_submap(X, Y, original_wake_field, predicted_wake_field,
         raise ValueError(f"Invalid type_of_error: {error_to_plot}. " +\
                          "Expected 'signed', 'absolute', or 'relative'.")
     zlabel = f"{error_to_plot.capitalize()} Deficit Error"
+    if torch.max(diff_wake_field) == 0.:
+        levels = np.linspace(0, 1e-2, 100)
+        zlabel += " (zero)"
     plot_submap(X, Y, diff_wake_field, zlabel, levels, cmap, ax)
 
 def __plot_contour(X, Y, Z,

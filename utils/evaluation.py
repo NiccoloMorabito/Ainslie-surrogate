@@ -2,6 +2,7 @@ import time
 import datetime
 import pandas as pd
 import torch
+import gpytorch
 import sklearn.metrics as metrics
 
 METRICS = [metrics.r2_score, metrics.explained_variance_score, metrics.mean_squared_error, \
@@ -43,37 +44,59 @@ def __get_predictions_outputs_time(model, test_dataloader) -> tuple[torch.Tensor
 
 def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
     start_time = time.time()
-    preds = model.predict(test_x)
+    predictions = model.predict(test_x)
     end_time = time.time()
     prediction_time = (end_time-start_time) / test_x.shape[0]
-    return preds, prediction_time
+    return predictions, prediction_time
 
-def __compute_other_metrics(outputs, predictions) -> dict[str, float]:
+def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor, float]:
+    with torch.no_grad(), gpytorch.settings.fast_pred_var():
+        start_time = time.time()
+        predictions = likelihood(model(test_x))
+        end_time = time.time()
+        
+    prediction_time = (end_time-start_time) / test_x.shape[0]
+    return predictions, prediction_time
+
+def __compute_other_metrics(outputs, predictions,
+                            model_description: str,
+                            prediction_time: float) -> dict[str, float]: #TODO change name
     metric_to_value = dict()
     for metric in METRICS:
         metric_to_value[metric.__name__] = metric(outputs, predictions)
         print(f"{metric.__name__}={metric(outputs, predictions)}")
+    print(f"Prediction time={prediction_time}s")
+    metric_to_value[MODEL_DESC] = model_description
+    metric_to_value[PREDICTION_TIME] = prediction_time
+    metric_to_value[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+
     return metric_to_value
 
 def test_pytorch_model(model, test_dataloader,
-                                    model_description: str, save_results: bool) -> None:
+                       model_description: str,
+                       save_results: bool) -> None:
     predictions, outputs, prediction_time = __get_predictions_outputs_time(model, test_dataloader)
     print("Test results for " + model_description)
-    metrics = __compute_other_metrics(outputs, predictions)
-    metrics[MODEL_DESC] = model_description
-    metrics[PREDICTION_TIME] = prediction_time
-    print(f"Prediction time={prediction_time}s")
-    metrics[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    metrics = __compute_other_metrics(outputs, predictions,
+                                      model_description, prediction_time)
 
     if save_results:
         __save_to_csv(METRICS_CSV_FILEPATH, metrics)
 
-def test_sklearn_model(model, test_x, test_y, model_description: str, save_results: bool) -> None:
+def test_gpytorch_model(model, likelihood, test_x, test_y,
+                        model_description: str, save_results: bool) -> None:
+    predictions, prediction_time = __get_predictions_time_gpy(model, likelihood, test_x)
+    print("Test results for " + model_description)
+    metrics = __compute_other_metrics(test_y, predictions, model_description, prediction_time)
+
+    if save_results:
+        __save_to_csv(METRICS_CSV_FILEPATH, metrics)
+
+def test_sklearn_model(model, test_x, test_y,
+                       model_description: str, save_results: bool) -> None:
     predictions, prediction_time = __get_predictions_time(model, test_x)
-    metrics = __compute_other_metrics(test_y, predictions)
-    metrics[MODEL_DESC] = model_description
-    metrics[PREDICTION_TIME] = prediction_time
-    metrics[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+    print("Test results for " + model_description)
+    metrics = __compute_other_metrics(test_y, predictions, model_description, prediction_time)
 
     if save_results:
         __save_to_csv(METRICS_CSV_FILEPATH, metrics)
