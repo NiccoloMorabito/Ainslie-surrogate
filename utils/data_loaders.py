@@ -4,6 +4,9 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import os
+from itertools import product
+import warnings
+
 import utils.utils as utils
 import utils.data_utils as data_utils
 
@@ -17,6 +20,9 @@ TI_CT_DEFAULT_REDUC_FACTOR = 4
 #TODO clean and clarify all this code, explaining:
     # - the arguments of the different functions
     # - univariate and multivariate as consequence of coords_as_input
+    # - fix the different methods for __(load_and)_split_data_* (versions for ws, versions without ws) (start from __load_and_split_data() method)
+    #   - distinguish among extrapolation and interpolation clearly
+    #   - try to standardize the extrapolation code
 #TODO fix the INPUT_VARIABLES list
 
 class WakeDataset(Dataset):
@@ -159,6 +165,7 @@ def get_wake_dataloaders(data_filepath: str,
                          consider_ws: bool,
                          coords_as_input: bool,
                          train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
+                         input_var_to_train_reduction_factor: dict[str, int] | None = None,
                          scaler=MinMaxScaler(), #TODO try also StandardScaler or choose a scaler taking ranges
                          batch_size: int | None = None,
                          batch_multiplier: int | None = None
@@ -170,7 +177,8 @@ def get_wake_dataloaders(data_filepath: str,
     elif not coords_as_input and batch_size is None:
         raise ValueError("batch_size must be specified in case of multivariate setting.")
 
-    dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc)
+    dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc,
+                                       input_var_to_train_reduction_factor)
     datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
 
     if coords_as_input: #batch size conversion in univariate
@@ -188,12 +196,15 @@ def get_wake_datasets(data_filepath: str,
                            consider_ws: bool,
                            coords_as_input: bool,
                            train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
+                           input_var_to_train_reduction_factor: dict[str, int] | None = None,
                            scaler=MinMaxScaler()) -> list[WakeDataset]:
-    dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc)
+    dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc,
+                                       input_var_to_train_reduction_factor)
     return __dataframes_to_datasets(dataframes, coords_as_input, scaler)
 
 def __load_and_split_data(data_folder: str, consider_ws: bool,
-        train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0) \
+        train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
+        input_var_to_train_reduction_factor: dict | None = None) \
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """In this moment, the method loads the data either including wind speed or not:
     - if yes, the data from different wind speeds is loaded and wind speed becomes an input feature;
@@ -209,15 +220,27 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
             INPUT_VARIABLES.append(WS)
         #TODO choose one of the following possibilities
         return __load_and_split_data_by_speed(data_folder, test_perc, validation_perc)
-        #return __load_and_split_data_NEW(data_folder, test_perc, validation_perc)
+        #return __load_and_split_data_by_speed_alternative(data_folder, test_perc, validation_perc)
     else:
         if WS in INPUT_VARIABLES:
             INPUT_VARIABLES.remove(WS)
-        # random ws in case ws is not important
-        return __load_and_split_data_by_input_params(data_folder, train_perc, test_perc, validation_perc)
+        # random ws in case ws is not important TODO make it more understandable
+        random_ws = 12
+        df = data_utils.load_netcfd(data_folder, wind_speed=random_ws, include_ws_column=True)
+        #TODO choose one of the following possibilities
+        if input_var_to_train_reduction_factor is None:
+            return __split_data_by_input_params_randomly(df, train_perc, test_perc, validation_perc)
+        else:
+            warnings.warn(
+                f"\nIgnoring percentages of train-valid-test split "
+                f"(train_perc={train_perc}, valid_perc={validation_perc}, test_perc={test_perc})\n"
+                f"and using the reduction factors for the training set instead:\n"
+                f"{input_var_to_train_reduction_factor}"
+            )
+            return __split_data_by_input_vars_uniformly(df, input_var_to_train_reduction_factor)
+            #return __split_data_by_input_vars_uniformly_exclusive(df, input_var_to_train_reduction_factor)
 
-def __load_and_split_data_by_speed(
-        data_folder: str,
+def __load_and_split_data_by_speed(data_folder: str,
         test_perc: float = 0.2, valid_perc: float = 0) \
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """
@@ -242,65 +265,7 @@ def __load_and_split_data_by_speed(
     test_df = __build_set_for_different_ws(data_folder, ws_split_lists[1])
     return train_df, test_df
 
-def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int],
-                                 tis: list[float] | None = None,
-                                 cts: list[float] | None = None) -> pd.DataFrame: #TODO change name (still the previous one when no tis and cts were specified)
-    ti_range = (min(tis), max(tis)) if tis else None
-    ct_range = (min(cts), max(cts)) if cts else None
-
-    data_frames = []
-    for wind_speed in wind_speeds:
-        try:
-            # by default for more speed values, only a subpart of TI-CT combinations are considered
-            df = data_utils.load_netcfd(data_folder, wind_speed, include_ws_column=True,
-                                        input_var_to_reduction_factor={
-                                            'ti': TI_CT_DEFAULT_REDUC_FACTOR,
-                                            'ct': TI_CT_DEFAULT_REDUC_FACTOR},
-                                            ti_range=ti_range, ct_range=ct_range)
-            data_frames.append(df)
-        except Exception as e: #TODO temporary code for non-working files
-            print(f"Error loading data for wind speed {wind_speed}")
-            
-    result = pd.concat(data_frames)
-    return result
-
-def __load_and_split_data_by_input_params(
-        data_folder: str,
-        train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0)\
-             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """
-    Function to split the data in training, test and possibly validation sets
-    according to thrust coefficient and turbulence intensity
-    """
-    random_ws = 12 #TODO random value here
-    df = data_utils.load_netcfd(data_folder, wind_speed=random_ws, include_ws_column=True)
-    input_combs = df[INPUT_VARIABLES].drop_duplicates()
-
-    # Sampling from input combinations
-    train_size = int(len(input_combs) * train_perc)
-    validation_size = int(len(input_combs) * validation_perc)
-    test_size = int(len(input_combs) * test_perc)
-    assert train_size + validation_size + test_size == len(input_combs),\
-        "Split percentages should sum to 1"
-    input_combs = input_combs.sample(frac=1, random_state=1)
-    train_df = pd.merge(input_combs[:train_size], df,\
-                            on=INPUT_VARIABLES, how='inner')
-    validation_df = pd.merge(input_combs[train_size:train_size+validation_size], df,\
-                            on=INPUT_VARIABLES, how='inner')
-    test_df = pd.merge(input_combs[train_size+validation_size:], df,\
-                            on=INPUT_VARIABLES, how='inner')
-
-    assert len(train_df) + len(validation_df) + len(test_df) == len(df)
-
-    if len(validation_df) > 0:
-        return train_df, validation_df, test_df
-    return train_df, test_df
-
-#TODO fix and complete this
-#TODO currently, (the data is not split according to the percentages and) it doesn't utilize all the data
-# as for each set (training, test and valid) the corresponding percentage is taken for ws and then
-# for TI and CT, therefore the other values of TI and CT are not taken at all for that particular set
-def __load_and_split_data_NEW(
+def __load_and_split_data_by_speed_alternative(
         data_folder: str,
         test_perc: float = 0.2, valid_perc: float = 0) \
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -308,6 +273,10 @@ def __load_and_split_data_NEW(
     Function to split the data in training, test and possibly validation sets
     according to wind speed, thrust coefficient and turbulence intensity
     """
+    #TODO fix and complete this
+    #TODO currently, (the data is not split according to the percentages and) it doesn't utilize all the data
+    # as for each set (training, test and valid) the corresponding percentage is taken for ws and then
+    # for TI and CT, therefore the other values of TI and CT are not taken at all for that particular set
     assert os.path.isdir(data_folder), "You need to pass a folder to load all the files in it"
     files = os.listdir(data_folder)
     assert len(files) > 0, "No files in this directory"
@@ -356,6 +325,122 @@ def __load_and_split_data_NEW(
                                            ti_split_lists[1], ct_split_lists[1])
     test_df = pd.concat([test_df1, test_df2])
     return train_df, test_df
+
+def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int],
+                                 tis: list[float] | None = None,
+                                 cts: list[float] | None = None) -> pd.DataFrame: #TODO change name (still the previous one when no tis and cts were specified)
+    ti_range = (min(tis), max(tis)) if tis else None
+    ct_range = (min(cts), max(cts)) if cts else None
+
+    data_frames = []
+    for wind_speed in wind_speeds:
+        try:
+            # by default for more speed values, only a subpart of TI-CT combinations are considered
+            df = data_utils.load_netcfd(data_folder, wind_speed, include_ws_column=True,
+                                        input_var_to_reduction_factor={
+                                            'ti': TI_CT_DEFAULT_REDUC_FACTOR,
+                                            'ct': TI_CT_DEFAULT_REDUC_FACTOR},
+                                            ti_range=ti_range, ct_range=ct_range)
+            data_frames.append(df)
+        except Exception as e: #TODO temporary code for non-working files
+            print(f"Error loading data for wind speed {wind_speed}")
+            
+    result = pd.concat(data_frames)
+    return result
+
+def __split_data_by_input_params_randomly(
+        df: pd.DataFrame,
+        train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0)\
+             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Function to split the data in training, test and possibly validation sets
+    according to thrust coefficient and turbulence intensity
+    """
+    input_combs = df[INPUT_VARIABLES].drop_duplicates()
+
+    # Sampling from input combinations
+    train_size = int(len(input_combs) * train_perc)
+    validation_size = int(len(input_combs) * validation_perc)
+    test_size = int(len(input_combs) * test_perc)
+    assert train_size + validation_size + test_size == len(input_combs),\
+        "Split percentages should sum to 1"
+    input_combs = input_combs.sample(frac=1, random_state=1) # shuffle
+    train_df = pd.merge(input_combs[:train_size], df,\
+                            on=INPUT_VARIABLES, how='inner')
+    validation_df = pd.merge(input_combs[train_size:train_size+validation_size], df,\
+                            on=INPUT_VARIABLES, how='inner')
+    test_df = pd.merge(input_combs[train_size+validation_size:], df,\
+                            on=INPUT_VARIABLES, how='inner')
+
+    assert len(train_df) + len(validation_df) + len(test_df) == len(df)
+
+    if len(validation_df) > 0:
+        return train_df, validation_df, test_df
+    return train_df, test_df
+
+def __split_data_by_input_vars_uniformly(df: pd.DataFrame,
+                                         input_var_to_train_reduction_factor: dict[str, int]) ->\
+                                            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    train_var_values = []
+
+    vars = list(input_var_to_train_reduction_factor.keys())
+    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
+
+    for input_var, reduction_factor in input_var_to_train_reduction_factor.items():
+        values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
+        train_values = list(values[::reduction_factor])
+        train_var_values.append(train_values)
+    
+    train_input_combs = pd.DataFrame(list(product(*train_var_values)), columns=vars)
+
+    remaining_input_combs = pd.merge(input_combs, train_input_combs, on=vars, how='left', indicator=True)
+    remaining_input_combs = remaining_input_combs[remaining_input_combs['_merge'] == 'left_only'][vars]
+
+    valid_input_combs = remaining_input_combs.iloc[::2]
+    test_input_combs = remaining_input_combs.iloc[1::2]
+
+    assert len(train_input_combs) + len(valid_input_combs) + len(test_input_combs) == len(input_combs)
+
+    dfs = []
+    for split_input_combs in [train_input_combs, valid_input_combs, test_input_combs]:
+        split_df = pd.merge(split_input_combs, df, on=vars, how='inner')
+        dfs.append(split_df)
+
+    return tuple(dfs)
+
+def __split_data_by_input_vars_uniformly_exclusive(df: pd.DataFrame,
+                                                 input_var_to_train_reduction_factor: dict[str, int]) ->\
+                                                    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # this method is similar to __load_and_split_data_by_input_vars_uniformly
+    # but it does not use all the combinations of input_vars,
+    # it just combined the ones that each split (train, test, valid) has
+    split_var_values = []
+    
+    for input_var, reduction_factor in input_var_to_train_reduction_factor.items():
+        values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
+        train_values = list(values[::reduction_factor])
+        remaining_values = values[~values.isin(train_values)]
+        valid_values = list(remaining_values[::2])
+        test_values = list(remaining_values[1::2])
+
+        assert len(train_values) + len(valid_values) + len(test_values) == len(values)
+
+        split_var_values.append((train_values, valid_values, test_values))
+    
+    train_list = [t[0] for t in split_var_values]
+    valid_list = [t[1] for t in split_var_values]
+    test_list = [t[2] for t in split_var_values]
+
+    dfs = []
+    vars = list(input_var_to_train_reduction_factor.keys())
+    for split in [train_list, valid_list, test_list]:
+        split_input_combs = pd.DataFrame(list(product(*split)), columns=vars)\
+            .sort_values(by=vars)\
+            .reset_index(drop=True)
+        split_df = pd.merge(split_input_combs, df, on=vars, how='inner')
+        dfs.append(split_df)
+
+    return tuple(dfs)
 
 def __dataframes_to_datasets(dfs,
                            coords_as_input: bool,

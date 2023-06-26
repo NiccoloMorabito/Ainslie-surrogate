@@ -155,5 +155,4 @@ cython_debug/
 
 .DS_Store
 /data
-temp_code.ipynb
 .vscode/
