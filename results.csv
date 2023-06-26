@@ -1,1 +1,2 @@
 model_description,prediction_time,r2_score,explained_variance_score,mean_squared_error,mean_absolute_error,median_absolute_error,mean_absolute_percentage_error,timestamp
+univariate_DT_max-depthNone_training_factors=ti4-ct4_discr_factors_x2_30_y-2_2_step0.125_TIstep0.01_CTstep0.01,1.2803477331824078e-07,0.9936270909480339,0.9936359912618545,7.146157344630566e-06,0.0009495010753930356,0.00034946357482112944,0.08077043292249024,26-06-2023_17-59-42
