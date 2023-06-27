@@ -216,6 +216,9 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
     This method returns 2 or 3 dataframes representing respectively: train, (validation) and test sets
     """
     if consider_ws:
+        if input_var_to_train_reduction_factor is not None:
+            raise ValueError("input_var_to_train_reduction_factor "\
+                             "should be specified only when not considering ws")
         if WS not in INPUT_VARIABLES:
             INPUT_VARIABLES.append(WS)
         #TODO choose one of the following possibilities
