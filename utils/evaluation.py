@@ -2,17 +2,19 @@ import time
 import datetime
 import pandas as pd
 import torch
+from torch.utils.data import DataLoader
 import gpytorch
+from sklearn.base import BaseEstimator
 import sklearn.metrics as metrics
 
 METRICS = [metrics.r2_score, metrics.explained_variance_score, metrics.mean_squared_error, \
            metrics.mean_absolute_error, metrics.median_absolute_error, metrics.mean_absolute_percentage_error]
-#TODO are mean_percentage_error and relative_error missing?
 MODEL_DESC = "model_description"
 PREDICTION_TIME = "prediction_time"
 TIMESTAMP = "timestamp"
 COLUMNS_ORDER = [MODEL_DESC, PREDICTION_TIME] + [metric.__name__ for metric in METRICS] + [TIMESTAMP]
-METRICS_CSV_FILEPATH = "results.csv"
+TRAINSET_CSV_FILEPATH = "trainset_results.csv"
+TESTSET_CSV_FILEPATH = "testset_results.csv"
 
 #TODO move in another utils file
 def __save_to_csv(filename: str, metrics: dict[str, float]) -> None:
@@ -27,20 +29,22 @@ def __save_to_csv(filename: str, metrics: dict[str, float]) -> None:
     df = pd.concat([df, new_df], ignore_index=True)
     df.to_csv(filename, index=False)
 
-def __get_predictions_outputs_time(model, test_dataloader) -> tuple[torch.Tensor, torch.Tensor, float]:
+def __get_predictions_groundtruths_time(
+        model,
+        dataloader: DataLoader)-> tuple[torch.Tensor, torch.Tensor, float]:
     predictions = list()
-    outputs = list()
+    ground_truths = list()
     with torch.no_grad():
         start_time = time.time()
-        for input, output in test_dataloader:
+        for input, output in dataloader:
             predictions.append(model(input))
-            outputs.append(output)
+            ground_truths.append(output)
         end_time = time.time()
 
     predictions = torch.cat(predictions, dim=0)
-    outputs = torch.cat(outputs, dim=0)
-    prediction_time = (end_time-start_time) / outputs.shape[0]
-    return predictions, outputs, prediction_time
+    ground_truths = torch.cat(ground_truths, dim=0)
+    prediction_time = (end_time-start_time) / ground_truths.shape[0]
+    return predictions, ground_truths, prediction_time
 
 def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
     start_time = time.time()
@@ -71,32 +75,40 @@ def __compute_other_metrics(outputs, predictions,
     metric_to_value[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     return metric_to_value
+    
 
-def test_pytorch_model(model, test_dataloader,
-                       model_description: str,
-                       save_results: bool) -> None:
-    predictions, outputs, prediction_time = __get_predictions_outputs_time(model, test_dataloader)
-    print("Test results for " + model_description)
-    metrics = __compute_other_metrics(outputs, predictions,
-                                      model_description, prediction_time)
+def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
+                   data_type : str,
+                   model_description: str,
+                   save_results: bool) -> None:
+    if data_type == 'train':
+        print("Train results for " + model_description)
+        filepath = TRAINSET_CSV_FILEPATH
+    elif data_type == 'test':
+        print("Test results for " + model_description)
+        filepath = TESTSET_CSV_FILEPATH
+    else:
+        raise ValueError(f"dataloader_type must be 'train' or 'test', not {data_type}")
+    
+    # PyTorch model
+    if isinstance(model, torch.nn.Module):
+        dataloader = data
+        predictions, ground_truths, prediction_time = __get_predictions_groundtruths_time(model, dataloader)
+    # sklearn model
+    elif isinstance(model, BaseEstimator):
+        x, ground_truths = data
+        predictions, prediction_time = __get_predictions_time(model, x)
+    else:
+        raise ValueError("Unsupported model type, pass a PyTorch, GpyTorch or Sklearn model.")
+    """
+    # GpyTorch model (not used for the moment, missing likelihood as parameter)
+    elif isinstance(model, gpytorch.models.GP):
+        x, ground_truths = data
+        predictions, prediction_time = __get_predictions_time_gpy(model, likelihood, x)
+    """
+
+    metrics = __compute_other_metrics(ground_truths, predictions,
+                                      model_description, prediction_time)    
 
     if save_results:
-        __save_to_csv(METRICS_CSV_FILEPATH, metrics)
-
-def test_gpytorch_model(model, likelihood, test_x, test_y,
-                        model_description: str, save_results: bool) -> None:
-    predictions, prediction_time = __get_predictions_time_gpy(model, likelihood, test_x)
-    print("Test results for " + model_description)
-    metrics = __compute_other_metrics(test_y, predictions, model_description, prediction_time)
-
-    if save_results:
-        __save_to_csv(METRICS_CSV_FILEPATH, metrics)
-
-def test_sklearn_model(model, test_x, test_y,
-                       model_description: str, save_results: bool) -> None:
-    predictions, prediction_time = __get_predictions_time(model, test_x)
-    print("Test results for " + model_description)
-    metrics = __compute_other_metrics(test_y, predictions, model_description, prediction_time)
-
-    if save_results:
-        __save_to_csv(METRICS_CSV_FILEPATH, metrics)
+        __save_to_csv(filepath, metrics)
