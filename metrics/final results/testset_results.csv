@@ -1,0 +1,2 @@
+model_description,prediction_time,r2_score,explained_variance_score,mean_squared_error,mean_absolute_error,median_absolute_error,mean_absolute_percentage_error,timestamp
+multivariate_LR_training_ranges=ti0.15-0.4-ct0.3-0.7_discr_factors_x2_30_y-2_2_step0.125_TIstep0.01_CTstep0.01,1.781648465124573e-05,0.18807918416113326,0.5492846746762682,0.0005836411,0.011408859,0.0088748755,2514626500000.0,06-07-2023_12-39-30
