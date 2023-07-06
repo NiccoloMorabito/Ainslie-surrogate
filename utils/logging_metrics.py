@@ -1,6 +1,3 @@
-import numpy as np
-import torch.nn as nn
-import torch
 import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -9,33 +6,8 @@ import os
 import re
 import time
 
-"""
-#TODO remove v
-class RMSELoss(nn.Module):
-    def __init__(self, eps=1e-12):
-        super().__init__()
-        self.mse = nn.MSELoss()
-        self.eps = eps
-        
-    def forward(self, yhat, y):
-        loss = torch.sqrt(self.mse(yhat, y) + self.eps)
-        return loss
-
-def field_based_rmse(wf1, wf2):
-    diff = wf1 - wf2
-    diff = diff.detach().numpy()
-    return np.sqrt(np.mean(np.square(diff)))
-
-def cell_based_rmse(wf1, wf2):
-    diff = wf1 - wf2
-    return np.sqrt(np.mean(np.square(diff), axis=1))
-
-def cell_based_mae(wf1, wf2):
-    # Mean absolute error = L1
-    absolute_diff = np.abs(wf1 - wf2)
-    return np.mean(absolute_diff, axis=1)
-#TODO remove ^
-"""
+METRICS_LOGGER_FOLDER = "metrics/logged_metrics/"
+EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
 class EpochTimer:
     def __init__(self, epoch_num: int):
@@ -48,8 +20,6 @@ class EpochTimer:
     def stop(self) -> float:
         end_time = time.time()
         return int(end_time - self.__start_time)
-
-EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
 #TODO change the code considering that epoch_num starts at 0, so it would be more readable adding 1
 class MetricsLogger:
@@ -171,12 +141,11 @@ class MetricsLogger:
         plt.show()
     
     def __get_filepath(self):
-        folder = "logged_metrics/"
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        if not os.path.exists(METRICS_LOGGER_FOLDER):
+            os.makedirs(METRICS_LOGGER_FOLDER)
         name = re.sub(r'[^a-zA-Z0-9 -_]', '', self.name).replace(" ", "-")
         filename = f"{name}_{self.timestamp}.csv"
-        return os.path.join(folder, filename)
+        return os.path.join(METRICS_LOGGER_FOLDER, filename)
     
     def __save_intermediate_metrics(self) -> None:
         if self.__logging:

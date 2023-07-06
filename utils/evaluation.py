@@ -13,8 +13,8 @@ MODEL_DESC = "model_description"
 PREDICTION_TIME = "prediction_time"
 TIMESTAMP = "timestamp"
 COLUMNS_ORDER = [MODEL_DESC, PREDICTION_TIME] + [metric.__name__ for metric in METRICS] + [TIMESTAMP]
-TRAINSET_CSV_FILEPATH = "trainset_results.csv"
-TESTSET_CSV_FILEPATH = "testset_results.csv"
+TRAINSET_CSV_FILEPATH = "metrics/final results/trainset_results.csv"
+TESTSET_CSV_FILEPATH = "metrics/final results/testset_results.csv"
 
 #TODO move in another utils file
 def __save_to_csv(filename: str, metrics: dict[str, float]) -> None:
