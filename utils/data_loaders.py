@@ -166,19 +166,17 @@ def get_wake_dataloaders(data_filepath: str,
                          coords_as_input: bool,
                          train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
                          input_var_to_train_reduction_factor: dict[str, int] | None = None,
-                         scaler=MinMaxScaler(), #TODO try also StandardScaler or choose a scaler taking ranges
+                         input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
+                         scaler = MinMaxScaler(), #TODO try also StandardScaler or choose a scaler taking ranges
                          batch_size: int | None = None,
                          batch_multiplier: int | None = None
                          ) -> tuple[DataLoader, DataLoader] | tuple[DataLoader, DataLoader, DataLoader]:
-    if batch_size is not None and batch_multiplier is not None:
-        raise ValueError("Cannot specify both batch_size and batch_multiplier.")
-    elif coords_as_input and batch_multiplier is None:
-        raise ValueError("batch_multiplier must be specified in case of univariate setting.")
-    elif not coords_as_input and batch_size is None:
-        raise ValueError("batch_size must be specified in case of multivariate setting.")
+    __check_train_params(consider_ws, train_perc, test_perc, validation_perc,
+                         input_var_to_train_reduction_factor, input_var_to_train_ranges)
+    __check_batch_params(coords_as_input, batch_size, batch_multiplier)
 
     dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc,
-                                       input_var_to_train_reduction_factor)
+                                       input_var_to_train_reduction_factor, input_var_to_train_ranges)
     datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
 
     if coords_as_input: #batch size conversion in univariate
@@ -197,14 +195,57 @@ def get_wake_datasets(data_filepath: str,
                            coords_as_input: bool,
                            train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
                            input_var_to_train_reduction_factor: dict[str, int] | None = None,
+                           input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
                            scaler=MinMaxScaler()) -> list[WakeDataset]:
+    __check_train_params(consider_ws, train_perc, test_perc, validation_perc,
+                         input_var_to_train_reduction_factor, input_var_to_train_ranges)
     dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc,
-                                       input_var_to_train_reduction_factor)
+                                       input_var_to_train_reduction_factor, input_var_to_train_ranges)
     return __dataframes_to_datasets(dataframes, coords_as_input, scaler)
+
+def __check_train_params(consider_ws: bool,
+                         train_perc: float, test_perc: float, validation_perc: float,
+                         input_var_to_train_reduction_factor,
+                         input_var_to_train_ranges
+                         ) -> None:
+    if input_var_to_train_reduction_factor is not None and input_var_to_train_ranges is not None:
+        raise ValueError("Cannot specify both 'input_var_to_train_reduction_factor'"
+                         " and 'input_var_to_train_range'")
+    if input_var_to_train_reduction_factor is not None:
+        if consider_ws:
+            raise ValueError("parameter 'input_var_to_train_reduction_factor' "
+                             "should be specified only when not considering ws")
+        else:
+            warnings.warn(
+                f"\nIgnoring percentages of train-valid-test split "
+                f"(train_perc={train_perc}, valid_perc={validation_perc}, test_perc={test_perc})\n"
+                f"and using the reduction factors for the training set instead:\n"
+                f"{input_var_to_train_reduction_factor}"
+            )
+    if input_var_to_train_ranges is not None:
+        if consider_ws:
+            raise ValueError("parameter 'input_var_to_train_range' "
+                             "should be specified only when not considering ws")
+        else:
+            warnings.warn(
+                f"\nIgnoring percentages of train-valid-test split "
+                f"(train_perc={train_perc}, valid_perc={validation_perc}, test_perc={test_perc})\n"
+                f"and using the following ranges for the training set instead:\n"
+                f"{input_var_to_train_ranges}"
+            )
+
+def __check_batch_params(coords_as_input: bool, batch_size: int, batch_multiplier: int) -> None:
+    if batch_size is not None and batch_multiplier is not None:
+        raise ValueError("Cannot specify both batch_size and batch_multiplier.")
+    elif coords_as_input and batch_multiplier is None:
+        raise ValueError("batch_multiplier must be specified in case of univariate setting.")
+    elif not coords_as_input and batch_size is None:
+        raise ValueError("batch_size must be specified in case of multivariate setting.")
 
 def __load_and_split_data(data_folder: str, consider_ws: bool,
         train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
-        input_var_to_train_reduction_factor: dict | None = None) \
+        input_var_to_train_reduction_factor: dict[str, int] | None = None,
+        input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None) \
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """In this moment, the method loads the data either including wind speed or not:
     - if yes, the data from different wind speeds is loaded and wind speed becomes an input feature;
@@ -216,9 +257,6 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
     This method returns 2 or 3 dataframes representing respectively: train, (validation) and test sets
     """
     if consider_ws:
-        if input_var_to_train_reduction_factor is not None:
-            raise ValueError("input_var_to_train_reduction_factor "\
-                             "should be specified only when not considering ws")
         if WS not in INPUT_VARIABLES:
             INPUT_VARIABLES.append(WS)
         #TODO choose one of the following possibilities
@@ -231,17 +269,13 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
         random_ws = 12
         df = data_utils.load_netcfd(data_folder, wind_speed=random_ws, include_ws_column=True)
         #TODO choose one of the following possibilities
-        if input_var_to_train_reduction_factor is None:
-            return __split_data_by_input_params_randomly(df, train_perc, test_perc, validation_perc)
-        else:
-            warnings.warn(
-                f"\nIgnoring percentages of train-valid-test split "
-                f"(train_perc={train_perc}, valid_perc={validation_perc}, test_perc={test_perc})\n"
-                f"and using the reduction factors for the training set instead:\n"
-                f"{input_var_to_train_reduction_factor}"
-            )
+        if input_var_to_train_reduction_factor is not None:
             return __split_data_by_input_vars_uniformly(df, input_var_to_train_reduction_factor)
             #return __split_data_by_input_vars_uniformly_exclusive(df, input_var_to_train_reduction_factor)
+        elif input_var_to_train_ranges is not None:
+            return __split_data_by_input_vars_cutting(df, input_var_to_train_ranges)
+        else:
+            return __split_data_by_input_params_randomly(df, train_perc, test_perc, validation_perc)
 
 def __load_and_split_data_by_speed(data_folder: str,
         test_perc: float = 0.2, valid_perc: float = 0) \
@@ -268,7 +302,7 @@ def __load_and_split_data_by_speed(data_folder: str,
     test_df = __build_set_for_different_ws(data_folder, ws_split_lists[1])
     return train_df, test_df
 
-def __load_and_split_data_by_speed_alternative(
+def __load_and_split_data_by_speed_alternative( #TODO change the name
         data_folder: str,
         test_perc: float = 0.2, valid_perc: float = 0) \
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -351,7 +385,7 @@ def __build_set_for_different_ws(data_folder: str, wind_speeds: list[int],
     result = pd.concat(data_frames)
     return result
 
-def __split_data_by_input_params_randomly(
+def __split_data_by_input_params_randomly( # for interpolation
         df: pd.DataFrame,
         train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0)\
              -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -381,21 +415,22 @@ def __split_data_by_input_params_randomly(
         return train_df, validation_df, test_df
     return train_df, test_df
 
-def __split_data_by_input_vars_uniformly(df: pd.DataFrame,
-                                         input_var_to_train_reduction_factor: dict[str, int]) ->\
-                                            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def __split_data_by_input_vars_uniformly( # for interpolation
+        df: pd.DataFrame,
+        input_var_to_train_reduction_factor: dict[str, int]) ->\
+            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_var_values = []
 
-    vars = list(input_var_to_train_reduction_factor.keys())
-    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
-
+    vars = list()
     for input_var, reduction_factor in input_var_to_train_reduction_factor.items():
         values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
         train_values = list(values[::reduction_factor])
+        vars.append(input_var)
         train_var_values.append(train_values)
     
     train_input_combs = pd.DataFrame(list(product(*train_var_values)), columns=vars)
-
+    
+    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
     remaining_input_combs = pd.merge(input_combs, train_input_combs, on=vars, how='left', indicator=True)
     remaining_input_combs = remaining_input_combs[remaining_input_combs['_merge'] == 'left_only'][vars]
 
@@ -411,12 +446,19 @@ def __split_data_by_input_vars_uniformly(df: pd.DataFrame,
 
     return tuple(dfs)
 
-def __split_data_by_input_vars_uniformly_exclusive(df: pd.DataFrame,
-                                                 input_var_to_train_reduction_factor: dict[str, int]) ->\
-                                                    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def __split_data_by_input_vars_uniformly_exclusive( #for interpolation 2
+    #TODO probably useless as the train values are the same, this just misses the chance to test on more
+        df: pd.DataFrame,
+        input_var_to_train_reduction_factor: dict[str, int]) ->\
+            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     # this method is similar to __load_and_split_data_by_input_vars_uniformly
     # but it does not use all the combinations of input_vars,
-    # it just combined the ones that each split (train, test, valid) has
+    # it just combined the combinations of input_vars that each split (train, test, valid) has
+
+    # the difference is basically whether a certain value a of CT (or TI) that is used in the
+    # train with a value of TI (or CT) b appears also in the test, combined with a different
+    # value c of TI (or CT) or not
+
     split_var_values = []
     
     for input_var, reduction_factor in input_var_to_train_reduction_factor.items():
@@ -440,6 +482,43 @@ def __split_data_by_input_vars_uniformly_exclusive(df: pd.DataFrame,
         split_input_combs = pd.DataFrame(list(product(*split)), columns=vars)\
             .sort_values(by=vars)\
             .reset_index(drop=True)
+        split_df = pd.merge(split_input_combs, df, on=vars, how='inner')
+        dfs.append(split_df)
+
+    return tuple(dfs)
+
+def __split_data_by_input_vars_cutting( #for extrapolation
+        df: pd.DataFrame,
+        input_var_to_train_ranges: dict[str, list[tuple[float, float]]]) ->\
+            tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    train_var_values = []
+
+    vars = list()
+    for input_var, train_ranges in input_var_to_train_ranges.items():
+        values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
+        train_values = list()
+
+        for train_range in train_ranges:
+            min_value, max_value = train_range
+            train_values += [value for value in values if min_value <= value <= max_value]
+        
+        print(f"{input_var}->{train_values}")
+        vars.append(input_var)
+        train_var_values.append(train_values)
+        
+    train_input_combs = pd.DataFrame(list(product(*train_var_values)), columns=vars)
+
+    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
+    remaining_input_combs = pd.merge(input_combs, train_input_combs, on=vars, how='left', indicator=True)
+    remaining_input_combs = remaining_input_combs[remaining_input_combs['_merge'] == 'left_only'][vars]
+
+    valid_input_combs = remaining_input_combs.iloc[::2]
+    test_input_combs = remaining_input_combs.iloc[1::2]
+
+    assert len(train_input_combs) + len(valid_input_combs) + len(test_input_combs) == len(input_combs)
+
+    dfs = []
+    for split_input_combs in [train_input_combs, valid_input_combs, test_input_combs]:
         split_df = pd.merge(split_input_combs, df, on=vars, how='inner')
         dfs.append(split_df)
 
