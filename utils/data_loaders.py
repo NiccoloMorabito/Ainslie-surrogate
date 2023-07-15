@@ -160,6 +160,71 @@ class WakeDataset(Dataset):
             ws = None
         
         return ti, ct, ws, wake_field, predicted_wake_field
+    
+class DeficitDataset(WakeDataset): #TODO either delete or merge with WakeDataset
+    """Dataset for individual instances of the wake simulation (not the entire grid)"""
+    def __init__(
+            self, df: pd.DataFrame,
+            coords_as_input: bool,
+            scaler = MinMaxScaler()
+        ) -> None:
+        #super().__init__()
+        self.__df = df
+        assert set(INPUT_VARIABLES) <= set(self.__df.columns) and \
+            {OUTPUT_VARIABLE} <= set(self.__df.columns)
+        self.__scaler = scaler
+
+        self.__prepare_univariate()
+                
+        assert len(self.inputs) == len(self.outputs)
+    
+    def __prepare_univariate(self) -> None:
+        # ordering to have a wake field ordered in the self.num_cells value by coords
+        self.__input_vars_names = INPUT_VARIABLES + COORDS_VARIABLES
+        self.__df = self.__df\
+            .sort_values(by=self.__input_vars_names)
+        self.unscaled_inputs = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
+        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_inputs))
+        #TODO this scaler must be used to fit (and only to fit?) the test set
+        # prob it's ok to fit_transform because I already know the ranges of the variables (?)
+        self.outputs = self.__df[OUTPUT_VARIABLE].values
+        self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
+    
+    def featurenum_to_featurename(self, featurenum: int) -> str:
+        return self.__input_vars_names[featurenum]
+    
+    def __len__(self) -> int:
+        return len(self.inputs)
+
+    def __getitem__(self, idx):
+        return self.inputs[idx], self.outputs[idx]
+    
+    def slice_for_field(self, field_idx: int):
+        start = field_idx * self.num_cells
+        end = start + self.num_cells
+        return slice(start, end)
+
+    def get_parameters_for_plotting_univariate(self, model, field_idx: int,
+                                               transformed_inputs = None) -> tuple:
+        #TODO
+        raise NotImplementedError("Not possible to plot in this case as the wake field is not complete")
+
+    def get_parameters_for_plotting_multivariate(self, model, idx: int) -> tuple:
+        input, wake_field = self.inputs[idx], self.outputs[idx]
+        if callable(model): # PyTorch model
+            predicted_wake_field = model(input)
+        elif hasattr(model, 'predict'):  # sklearn model
+            predicted_wake_field = torch.tensor(model.predict(input.reshape(1, -1)).reshape(-1))
+        else:
+            raise ValueError("Invalid model type. Expected PyTorch model or sklearn model.")
+
+        if WS in INPUT_VARIABLES:
+            ti, ct, ws = self.unscaled_inputs[idx]
+        else:
+            ti, ct = input
+            ws = None
+        
+        return ti, ct, ws, wake_field, predicted_wake_field
 
 def get_wake_dataloaders(data_filepath: str,
                          consider_ws: bool,
@@ -180,7 +245,12 @@ def get_wake_dataloaders(data_filepath: str,
     datasets = __dataframes_to_datasets(dataframes, coords_as_input, scaler)
 
     if coords_as_input: #batch size conversion in univariate
-        batch_size = batch_multiplier * datasets[0].num_cells
+        try:
+            batch_size = batch_multiplier * datasets[0].num_cells
+        # this is for when the wake field is not complete (i.e. DeficitDataset)
+        #TODO remove or fix it
+        except:
+            batch_size = batch_multiplier * 500
     
     training_dataloader = DataLoader(datasets[0], batch_size, shuffle=True)
     if len(datasets) > 2:
@@ -249,10 +319,9 @@ def __load_and_split_data(data_folder: str, consider_ws: bool,
             -> tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """In this moment, the method loads the data either including wind speed or not:
     - if yes, the data from different wind speeds is loaded and wind speed becomes an input feature;
-        (in this case, the train-test split is done on values of wind speed randomly)
+        (different train-test splits are done on values of wind speed)
     - otherwise, a random wind speed is loaded and the input features are only the standard ones
-        (in this case, the train-test split is done on the other input features)
-    #TODO in the future, more combinations of train-test splits could be implemented
+        (different train-test splits are done on the other input features)
 
     This method returns 2 or 3 dataframes representing respectively: train, (validation) and test sets
     """
@@ -326,8 +395,9 @@ def __load_and_split_data_by_speed_alternative( #TODO change the name
     cts = list(utils.my_arange(0.1, 24/25, ct_step * TI_CT_DEFAULT_REDUC_FACTOR))
 
     ws_split_lists = utils.random_split_list(wind_speeds, test_perc, valid_perc)
-    ti_split_lists = utils.ordered_split_list(tis, test_perc, valid_perc) #TODO random or ordered?
-    ct_split_lists = utils.ordered_split_list(cts, test_perc, valid_perc) #TODO random or ordered?
+    #TODO the ordered method must be used for ti and ct for the method used later, but what about random?
+    ti_split_lists = utils.ordered_split_list(tis, test_perc, valid_perc)
+    ct_split_lists = utils.ordered_split_list(cts, test_perc, valid_perc)
     print(ws_split_lists, ti_split_lists, ct_split_lists)
 
     train_df = __build_set_for_different_ws(data_folder, ws_split_lists[0],
@@ -502,7 +572,6 @@ def __split_data_by_input_vars_cutting( #for extrapolation
             min_value, max_value = train_range
             train_values += [value for value in values if min_value <= value <= max_value]
         
-        print(f"{input_var}->{train_values}")
         vars.append(input_var)
         train_var_values.append(train_values)
         
@@ -525,6 +594,10 @@ def __split_data_by_input_vars_cutting( #for extrapolation
     return tuple(dfs)
 
 def __dataframes_to_datasets(dfs,
-                           coords_as_input: bool,
-                           scaler):
+                             coords_as_input: bool,
+                             scaler):
+    # if the wake field is not complete #TODO make this check more solid and elegant
+    if not dfs[0][COORDS_VARIABLES].drop_duplicates().equals(dfs[1][COORDS_VARIABLES].drop_duplicates()):
+        print("Incomplete field, creating DeficitDatasets...")
+        return [DeficitDataset(df, coords_as_input, scaler) for df in dfs]
     return [WakeDataset(df, coords_as_input, scaler) for df in dfs]
