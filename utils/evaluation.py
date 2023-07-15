@@ -7,8 +7,18 @@ import gpytorch
 from sklearn.base import BaseEstimator
 import sklearn.metrics as metrics
 
+#TODO move somewhere else
+import numpy as np
+def peak_signal_noise_ratio(true_wakefield: np.ndarray, predicted_wakefield: np.ndarray,
+                            data_range: int = 1) -> float:
+    true_wakefield = np.asarray(true_wakefield, dtype=np.float64)
+    predicted_wakefield = np.asarray(predicted_wakefield, dtype=np.float64)
+    mse = np.mean((true_wakefield - predicted_wakefield) ** 2, dtype=np.float64)
+    return 10 * np.log10((data_range ** 2) / mse)
+
 METRICS = [metrics.r2_score, metrics.explained_variance_score, metrics.mean_squared_error, \
-           metrics.mean_absolute_error, metrics.median_absolute_error, metrics.mean_absolute_percentage_error]
+           metrics.mean_absolute_error, metrics.median_absolute_error, \
+            metrics.mean_absolute_percentage_error, peak_signal_noise_ratio]
 MODEL_DESC = "model_description"
 PREDICTION_TIME = "prediction_time"
 TIMESTAMP = "timestamp"
