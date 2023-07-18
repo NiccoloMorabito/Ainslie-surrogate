@@ -1,8 +1,8 @@
+from numpy import ndarray
 import torch
 from torch.utils.data import Dataset, DataLoader
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 import os
 from itertools import product
 import warnings
@@ -15,7 +15,40 @@ WS = "ws"
 OUTPUT_VARIABLE = "wind_deficit"
 COORDS_VARIABLES = ["x/D", "y/D"]
 
+INPUT_VARIABLE_TO_RANGE = {
+    "ti": (0, 1),
+    "ct": (0.1, 24/25),
+    "ws": (4, 25),
+    "x/D": (2, 30),
+    "y/D": (-2, 2)
+}
+
 TI_CT_DEFAULT_REDUC_FACTOR = 4
+
+#TODO move this scaler somewhere else
+from sklearn.base import BaseEstimator, TransformerMixin
+class RangeScaler(BaseEstimator, TransformerMixin):
+    def __init__(self, var_to_range: dict[str, tuple[float, float]]):
+        super(RangeScaler).__init__()
+        self.var_to_range = var_to_range
+        # desired new min and max values
+        self.min = 0
+        self.max = 1
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X: pd.DataFrame):
+        scaled_X = X.copy()
+        #for var, range in self.var_to_range.items():
+        for var in X.columns:
+            original_min, original_max = self.var_to_range[var]
+            scaled_X[var] = ((X[var] - original_min) / (original_max - original_min)) * (self.max - self.min) + self.min
+        return scaled_X.values
+    
+    def fit_transform(self, X: pd.DataFrame, y = None) -> ndarray:
+        return self.transform(X)
+
 
 #TODO clean and clarify all this code, explaining:
     # - the arguments of the different functions
@@ -36,7 +69,7 @@ class WakeDataset(Dataset):
     def __init__(
             self, df: pd.DataFrame,
             coords_as_input: bool,
-            scaler = MinMaxScaler()
+            scaler = RangeScaler(INPUT_VARIABLE_TO_RANGE) #MinMaxScaler()
         ) -> None:
         super().__init__()
         self.__df = df
@@ -59,10 +92,8 @@ class WakeDataset(Dataset):
         self.__input_vars_names = INPUT_VARIABLES + COORDS_VARIABLES
         self.__df = self.__df\
             .sort_values(by=self.__input_vars_names)
-        self.unscaled_inputs = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
-        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_inputs))
-        #TODO this scaler must be used to fit (and only to fit?) the test set
-        # prob it's ok to fit_transform because I already know the ranges of the variables (?)
+        self.unscaled_inputs = self.__df[self.__input_vars_names].values
+        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.__df[self.__input_vars_names]))
         self.outputs = self.__df[OUTPUT_VARIABLE].values
         self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
 
@@ -99,11 +130,9 @@ class WakeDataset(Dataset):
                 self.Y_grid = Ys.reshape(trasp_shape).T
 
         self.inputs = torch.stack(inputs, dim=0)
-        if WS in INPUT_VARIABLES:
-            # scaling only if wind speed is included, otherwise ct and ti have the same ranges
-            #TODO maybe I can scale by default
-            self.unscaled_inputs = self.inputs
-            self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.inputs))
+        self.unscaled_inputs = self.inputs
+        inputs_df = pd.DataFrame(self.inputs, columns=self.__input_vars_names)
+        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(inputs_df))
         self.outputs = torch.stack(outputs)
     
     def featurenum_to_featurename(self, featurenum: int) -> str:
@@ -166,7 +195,7 @@ class DeficitDataset(WakeDataset): #TODO either delete or merge with WakeDataset
     def __init__(
             self, df: pd.DataFrame,
             coords_as_input: bool,
-            scaler = MinMaxScaler()
+            scaler = RangeScaler(INPUT_VARIABLE_TO_RANGE) #MinMaxScaler()
         ) -> None:
         #super().__init__()
         self.__df = df
@@ -183,10 +212,8 @@ class DeficitDataset(WakeDataset): #TODO either delete or merge with WakeDataset
         self.__input_vars_names = INPUT_VARIABLES + COORDS_VARIABLES
         self.__df = self.__df\
             .sort_values(by=self.__input_vars_names)
-        self.unscaled_inputs = self.__df[INPUT_VARIABLES + COORDS_VARIABLES].values
-        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.unscaled_inputs))
-        #TODO this scaler must be used to fit (and only to fit?) the test set
-        # prob it's ok to fit_transform because I already know the ranges of the variables (?)
+        self.unscaled_inputs = self.__df[self.__input_vars_names].values
+        self.inputs = torch.FloatTensor(self.__scaler.fit_transform(self.__df[self.__input_vars_names]))
         self.outputs = self.__df[OUTPUT_VARIABLE].values
         self.outputs = torch.FloatTensor(self.outputs).unsqueeze(1)
     
@@ -232,7 +259,7 @@ def get_wake_dataloaders(data_filepath: str,
                          train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
                          input_var_to_train_reduction_factor: dict[str, int] | None = None,
                          input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
-                         scaler = MinMaxScaler(), #TODO try also StandardScaler or choose a scaler taking ranges
+                         scaler = RangeScaler(INPUT_VARIABLE_TO_RANGE), #MinMaxScaler()
                          batch_size: int | None = None,
                          batch_multiplier: int | None = None
                          ) -> tuple[DataLoader, DataLoader] | tuple[DataLoader, DataLoader, DataLoader]:
@@ -266,7 +293,8 @@ def get_wake_datasets(data_filepath: str,
                            train_perc: float = 0.8, test_perc: float = 0.2, validation_perc: float = 0,
                            input_var_to_train_reduction_factor: dict[str, int] | None = None,
                            input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
-                           scaler=MinMaxScaler()) -> list[WakeDataset]:
+                           scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE)
+                    ) -> list[WakeDataset]:
     __check_train_params(consider_ws, train_perc, test_perc, validation_perc,
                          input_var_to_train_reduction_factor, input_var_to_train_ranges)
     dataframes = __load_and_split_data(data_filepath, consider_ws, train_perc, test_perc, validation_perc,
@@ -398,7 +426,6 @@ def __load_and_split_data_by_speed_alternative( #TODO change the name
     #TODO the ordered method must be used for ti and ct for the method used later, but what about random?
     ti_split_lists = utils.ordered_split_list(tis, test_perc, valid_perc)
     ct_split_lists = utils.ordered_split_list(cts, test_perc, valid_perc)
-    print(ws_split_lists, ti_split_lists, ct_split_lists)
 
     train_df = __build_set_for_different_ws(data_folder, ws_split_lists[0],
                                             ti_split_lists[0], ct_split_lists[0])
