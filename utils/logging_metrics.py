@@ -99,18 +99,22 @@ class MetricsLogger:
         self.df.index.name = 'epoch #'
         self.__logging = False
 
-    def plot_metrics_by_epoch(self, metric_names: list[str] | None = None, all_in_one: bool = True):
+    def plot_metrics_by_epoch(self, metric_names: list[str] | None = None,
+                              all_in_one: bool = True,
+                              start_from_epoch: int = 1):
         if self.__logging:
             self.__stop()
 
         metrics_to_plot = self.__logged_metrics if metric_names is None else metric_names
         if all_in_one:
-            self.__plot_many_metrics_by_epoch(metrics_to_plot)
+            self.__plot_many_metrics_by_epoch(metrics_to_plot, start_from_epoch)
         else:
             for metric_name in metrics_to_plot:
-                self.__plot_single_metric_by_epoch(metric_name)
+                self.__plot_single_metric_by_epoch(metric_name, start_from_epoch)
     
-    def __plot_single_metric_by_epoch(self, metric_name: str):
+    def __plot_single_metric_by_epoch(self,
+                                      metric_name: str,
+                                      start_from_epoch: int = 1):
         if metric_name not in self.__logged_metrics:
             warnings.warn(f"{metric_name} has not been logged yet: " +\
                           "no plot for this metric has been generated")
@@ -118,21 +122,28 @@ class MetricsLogger:
         if self.__logging:
             self.__stop()
         
-        plt.plot(self.df.index, self.df[metric_name])
+        plt.plot(self.df.index[start_from_epoch:],
+                 self.df[metric_name].iloc[start_from_epoch:])
         plt.xlabel('Epoch #')
         plt.ylabel(metric_name)
         plt.title(f'{metric_name} by Epoch')
         plt.grid(True)
         plt.show()
     
-    def __plot_many_metrics_by_epoch(self, metric_names):
+    def __plot_many_metrics_by_epoch(self,
+                                     metric_names: list[str],
+                                     start_from_epoch: int = 1):
         missing_metrics = set(metric_names) - set(self.__logged_metrics)
         assert len(missing_metrics) == 0, \
             f"The following metrics have not been logged yet: {', '.join(list(missing_metrics))}"
         if self.__logging:
             self.__stop()
         for metric_name in metric_names:
-            plt.plot(self.df.index, self.df[metric_name], label=metric_name)
+            if metric_name == EPOCH_TIME_LABEL:
+                continue
+            plt.plot(self.df.index[start_from_epoch:],
+                     self.df[metric_name].iloc[start_from_epoch:],
+                     label=metric_name)
         plt.xlabel('Epoch #')
         plt.ylabel('Metric Value')
         plt.title('Metrics by Epoch')
