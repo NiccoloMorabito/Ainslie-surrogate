@@ -78,3 +78,15 @@ def get_wake_coordinates_from_discr_factors(
     x_range = np.arange(x_start_factor, x_end_factor, grid_factor)
     y_range = np.arange(y_start_factor, y_end_factor, grid_factor)
     return x_range, y_range
+
+def save_metrics_to_csv(filename: str, metrics: dict[str, float], metrics_order) -> None:
+    try:
+        df = pd.read_csv(filename)
+    except FileNotFoundError:
+        df = pd.DataFrame()
+
+    new_df = pd.DataFrame(metrics, index=[0])\
+        .reindex(columns=metrics_order)
+
+    df = pd.concat([df, new_df], ignore_index=True)
+    df.to_csv(filename, index=False)

@@ -6,38 +6,19 @@ from torch.utils.data import DataLoader
 import gpytorch
 from sklearn.base import BaseEstimator
 import sklearn.metrics as metrics
+from utils.metrics import peak_signal_noise_ratio
+from utils.utils import save_metrics_to_csv
 
-#TODO move somewhere else
-import numpy as np
-def peak_signal_noise_ratio(true_wakefield: np.ndarray, predicted_wakefield: np.ndarray,
-                            data_range: int = 1) -> float:
-    true_wakefield = np.asarray(true_wakefield, dtype=np.float64)
-    predicted_wakefield = np.asarray(predicted_wakefield, dtype=np.float64)
-    mse = np.mean((true_wakefield - predicted_wakefield) ** 2, dtype=np.float64)
-    return 10 * np.log10((data_range ** 2) / mse)
+MODEL_DESC = "model_description"
+PREDICTION_TIME = "prediction_time"
+TIMESTAMP = "timestamp"
+TRAINSET_CSV_FILEPATH = "metrics/final_results/trainset_results.csv"
+TESTSET_CSV_FILEPATH = "metrics/final_results/testset_results.csv"
 
 METRICS = [metrics.r2_score, metrics.explained_variance_score, metrics.mean_squared_error, \
            metrics.mean_absolute_error, metrics.median_absolute_error, \
             metrics.mean_absolute_percentage_error, peak_signal_noise_ratio]
-MODEL_DESC = "model_description"
-PREDICTION_TIME = "prediction_time"
-TIMESTAMP = "timestamp"
 COLUMNS_ORDER = [MODEL_DESC, PREDICTION_TIME] + [metric.__name__ for metric in METRICS] + [TIMESTAMP]
-TRAINSET_CSV_FILEPATH = "metrics/final results/trainset_results.csv"
-TESTSET_CSV_FILEPATH = "metrics/final results/testset_results.csv"
-
-#TODO move in another utils file
-def __save_to_csv(filename: str, metrics: dict[str, float]) -> None:
-    try:
-        df = pd.read_csv(filename)
-    except FileNotFoundError:
-        df = pd.DataFrame()
-
-    new_df = pd.DataFrame(metrics, index=[0])\
-        .reindex(columns=COLUMNS_ORDER)
-
-    df = pd.concat([df, new_df], ignore_index=True)
-    df.to_csv(filename, index=False)
 
 def __get_predictions_groundtruths_time(
         model,
@@ -121,4 +102,4 @@ def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
                                       model_description, prediction_time)    
 
     if save_results:
-        __save_to_csv(filepath, metrics)
+        save_metrics_to_csv(filepath, metrics, metrics_order=COLUMNS_ORDER)
