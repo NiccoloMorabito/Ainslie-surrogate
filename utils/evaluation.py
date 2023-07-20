@@ -1,6 +1,5 @@
 import time
 import datetime
-import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 import gpytorch
@@ -71,7 +70,8 @@ def __compute_other_metrics(outputs, predictions,
 def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
                    data_type : str,
                    model_description: str,
-                   save_results: bool) -> None:
+                   save_results: bool,
+                   experiment: str | None = None) -> None:
     if data_type == 'train':
         print("Train results for " + model_description)
         filepath = TRAINSET_CSV_FILEPATH
@@ -80,6 +80,10 @@ def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
         filepath = TESTSET_CSV_FILEPATH
     else:
         raise ValueError(f"dataloader_type must be 'train' or 'test', not {data_type}")
+    
+    if experiment is not None:
+        filepath = filepath.replace(".csv", "_" + experiment + ".csv")
+        print(filepath)
     
     # PyTorch model
     if isinstance(model, torch.nn.Module):
@@ -102,4 +106,4 @@ def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
                                       model_description, prediction_time)    
 
     if save_results:
-        save_metrics_to_csv(filepath, metrics, metrics_order=COLUMNS_ORDER)
+        save_metrics_to_csv(filepath, metrics, COLUMNS_ORDER)

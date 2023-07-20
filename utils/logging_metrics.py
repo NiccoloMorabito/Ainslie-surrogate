@@ -10,6 +10,7 @@ METRICS_LOGGER_FOLDER = "metrics/logged_metrics/"
 EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
 class EpochTimer:
+    #TODO this timer considers also the stand-by time (idle) time
     def __init__(self, epoch_num: int):
         self.__epoch_num = epoch_num
         self.__start_time = time.time()
@@ -25,14 +26,17 @@ class EpochTimer:
 class MetricsLogger:
 
     def __init__(self, name: str, automatic_save_after: int = 50,
-                 df_metrics: pd.DataFrame | None = None) -> None:
+                 df_metrics: pd.DataFrame | None = None,
+                 verbose: bool = True) -> None:
         self.name = name
         self.automatic_save_after = automatic_save_after
+        self.verbose = verbose
         if df_metrics is None:
             self.__epoch_to_metrics = dict()
             self.__logged_metrics = set()
             self.__logging = True
-            print(f"Logging {name}", end="")
+            if self.verbose:
+                print(f"Logging {name}", end="")
         else:
             self.__epoch_to_metrics = dict()
             for index, row in df_metrics.iterrows():
@@ -41,7 +45,8 @@ class MetricsLogger:
             #TODO self.__logged_metrics.remove(EPOCH_TIME_LABEL)
             self.df = df_metrics
             self.__logging = False
-            print(f"Logged the following metrics for {name}: {self.get_logged_metric_names()}")
+            if self.verbose:
+                print(f"Logged the following metrics for {name}: {self.get_logged_metric_names()}")
         self.__epoch_timer = None
         self.timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
     
@@ -56,14 +61,16 @@ class MetricsLogger:
             self.__start_epoch_timer(epoch_num)
 
             self.__epoch_to_metrics[epoch_num] = dict()
-            print(f"\nEpoch {epoch_num} ->", end="\t")
+            if self.verbose:
+                print(f"\nEpoch {epoch_num} ->", end="\t")
             if self.__logged_metrics and metric_name not in self.__logged_metrics:
                 warnings.warn(
                     f"The metric '{metric_name}' has not been registered in the previous epochs.")
         
         self.__epoch_to_metrics[epoch_num][metric_name] = metric_value
         self.__logged_metrics.add(metric_name)
-        print(f"{metric_name}={metric_value}", end="\t")
+        if self.verbose:
+            print(f"{metric_name}={metric_value}", end="\t")
     
     def __start_epoch_timer(self, epoch_num: int) -> None:
         self.__check_previous_epochs_time(epoch_num) #TODO
@@ -86,7 +93,8 @@ class MetricsLogger:
             return
         epoch_num = self.__epoch_timer.get_epoch_num()
         epoch_time = self.__epoch_timer.stop()
-        print(f"{EPOCH_TIME_LABEL}={epoch_time}", end="\t")
+        if self.verbose:
+            print(f"{EPOCH_TIME_LABEL}={epoch_time}", end="\t")
         self.__epoch_timer = None
         self.__epoch_to_metrics[epoch_num][EPOCH_TIME_LABEL] = epoch_time
     
@@ -172,12 +180,21 @@ class MetricsLogger:
             filepath = self.__get_filepath()
         
         self.df.to_csv(filepath)
-        print(f"Metrics exported in the following csv file: {filepath}")
+        if self.verbose:
+            print(f"Metrics exported in the following csv file: {filepath}")
     
-    def get_training_time(self, according_to: str = 'Validation loss') -> int:
+    def get_training_time(self, according_to: str = 'Validation loss', verbose: bool = False) -> int:
         """Overall training time of the best model
         (i.e. overall time required for the best model to be obtained)"""
-        if according_to not in self.__logged_metrics:
+
+        #TODO improve code to choose the metric according_to
+        found = False
+        for logged_metric in self.__logged_metrics:
+            if according_to in logged_metric:
+                according_to = logged_metric
+                found = True
+                break
+        if not found:
             raise ValueError(f"The metric {according_to} has not been logged")
 
         if self.__logging:
@@ -185,8 +202,9 @@ class MetricsLogger:
         
         final_epoch = self.__find_best_model_epoch(according_to)
         training_time = self.__sum_training_times(final_epoch)
-        print(f"The best model has been generated during the {final_epoch}th epoch"+\
-              f" and it took {training_time} seconds for training.")
+        if verbose:
+            print(f"The best model has been generated during the {final_epoch}th epoch"+\
+                f" and it took {training_time} seconds for training.")
         return training_time
         
     def __find_best_model_epoch(self, according_to: str) -> int:
@@ -201,16 +219,25 @@ class MetricsLogger:
                 final_epoch = epoch
         return final_epoch
 
-    def __sum_training_times(self, final_epoch: int) -> int:
-        training_time = 0
-        for epoch, metrics in self.__epoch_to_metrics.items():
-            if epoch >= final_epoch:
-                break
-            training_time += metrics[EPOCH_TIME_LABEL]
-        return int(training_time)
+    def __sum_training_times(self, final_epoch: int, threshold: float = 5) -> int:
+        import numpy as np
+        training_times = [metrics[EPOCH_TIME_LABEL]
+                          for epoch, metrics in self.__epoch_to_metrics.items()
+                          if epoch < final_epoch]
+
+        # remove outliers (sometimes epochs include stand-by time)
+        avg_time_per_epoch = np.mean(training_times)
+        z_scores = np.abs((training_times -  avg_time_per_epoch)/ np.std(training_times))
+
+        training_times_cleaned = [int(time) if z_score <= threshold else int(avg_time_per_epoch)
+                                  for time, z_score in zip(training_times, z_scores)]
+
+        return sum(training_times_cleaned)
     
     @staticmethod
-    def from_csv(filepath: str):
+    def from_csv(filepath: str, verbose: bool = False):
         logs_df = pd.read_csv(filepath, header=0, index_col='epoch #')
-        metrics_logger = MetricsLogger(name=filepath.split("/")[1].split("_")[0], df_metrics=logs_df)
+        metrics_logger = MetricsLogger(name=filepath.split("/")[1].split("_")[0],
+                                       df_metrics=logs_df,
+                                       verbose=verbose)
         return metrics_logger
