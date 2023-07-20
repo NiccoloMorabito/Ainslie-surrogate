@@ -9,7 +9,7 @@ from utils.metrics import peak_signal_noise_ratio
 from utils.utils import save_metrics_to_csv
 
 MODEL_DESC = "model_description"
-PREDICTION_TIME = "prediction_time"
+PREDICTION_TIME = "prediction_time" # prediction time per simulation (i.e. whole wakefield)
 TIMESTAMP = "timestamp"
 TRAINSET_CSV_FILEPATH = "metrics/final_results/trainset_results.csv"
 TESTSET_CSV_FILEPATH = "metrics/final_results/testset_results.csv"
@@ -33,14 +33,16 @@ def __get_predictions_groundtruths_time(
 
     predictions = torch.cat(predictions, dim=0)
     ground_truths = torch.cat(ground_truths, dim=0)
-    prediction_time = (end_time-start_time) / ground_truths.shape[0]
+    num_simulations = ground_truths.shape[0]
+    prediction_time = (end_time-start_time) / num_simulations
     return predictions, ground_truths, prediction_time
 
 def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
     start_time = time.time()
     predictions = model.predict(test_x)
     end_time = time.time()
-    prediction_time = (end_time-start_time) / test_x.shape[0]
+    num_simulations = test_x.shape[0]
+    prediction_time = (end_time-start_time) / num_simulations
     return predictions, prediction_time
 
 def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor, float]:
@@ -48,8 +50,8 @@ def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor,
         start_time = time.time()
         predictions = likelihood(model(test_x))
         end_time = time.time()
-        
-    prediction_time = (end_time-start_time) / test_x.shape[0]
+    num_simulations = test_x.shape[0]
+    prediction_time = (end_time-start_time) / num_simulations
     return predictions, prediction_time
 
 def __compute_other_metrics(outputs, predictions,
@@ -86,15 +88,16 @@ def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
         print(filepath)
     
     # PyTorch model
-    if isinstance(model, torch.nn.Module):
+    if isinstance(model, torch.nn.Module) and isinstance(data, DataLoader):
         dataloader = data
         predictions, ground_truths, prediction_time = __get_predictions_groundtruths_time(model, dataloader)
     # sklearn model
-    elif isinstance(model, BaseEstimator):
+    elif isinstance(model, BaseEstimator) and isinstance(data, tuple) and all(isinstance(item, torch.Tensor) for item in data):
         x, ground_truths = data
         predictions, prediction_time = __get_predictions_time(model, x)
     else:
-        raise ValueError("Unsupported model type, pass a PyTorch, GpyTorch or Sklearn model.")
+        raise ValueError("Unsupported model or data type. Pass a PyTorch, GpyTorch or "
+        "Sklearn model and a DataLoader or tuple of tensors.")
     """
     # GpyTorch model (not used for the moment, missing likelihood as parameter)
     elif isinstance(model, gpytorch.models.GP):
