@@ -12,6 +12,9 @@ DEFAULT_YLABEL = "Crosswind distance [y/D]"
 DEFICIT_LEVELS = np.linspace(0, 1, 5000) # default levels for deficit, as the range is [0,1)
 
 MIN_X = -2 # for plotting near-wake region
+MAX_X = 30
+MIN_Y = -1.875
+MAX_Y = 1.875
 
 TURBINE_SYMBOL_PATH = 'utils/turbine.png'
 
@@ -84,9 +87,9 @@ def plot_maps(X, Y, original, predicted,
     levels = np.linspace(0, max_deficit, 5000)
 
     if error_to_plot is None:
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))  # Create a figure with two subplots
+        fig, axs = plt.subplots(1, 2, figsize=(10, 4))  # Create a figure with two subplots
     else:
-        fig, axs = plt.subplots(1, 3, figsize=(15, 5))  # Create a figure with three subplots
+        fig, axs = plt.subplots(1, 3, figsize=(15, 4))  # Create a figure with three subplots
 
     plot_submap(X, Y, original, zlabel=f"Actual {zlabel}", levels=levels, ax=axs[0],
                 add_near_wake=add_near_wake, plot_wind_turbine=plot_wind_turbine)
@@ -171,8 +174,12 @@ def __plot_contour(X, Y, Z,
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    #ax.set_aspect('equal')
+    # Set aspect ratio to 1:1
+    #print(X.max() - X.min(), Y.max() - Y.min(), (X.max() - X.min()) / (Y.max() - Y.min()))
+    #ax.set_aspect((X.max() - X.min()) / (Y.max() - Y.min()))
     c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
+    ax.set_xlim([MIN_X, MAX_X])
+    ax.set_ylim([MIN_Y, MAX_Y])
     plt.colorbar(c, label=zlabel, ax=ax)
     if show:
         plt.show()
