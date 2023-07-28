@@ -252,3 +252,54 @@ class MetricsLogger:
                                        df_metrics=logs_df,
                                        verbose=verbose)
         return metrics_logger
+
+    @staticmethod
+    def plot_many_logs_metrics_by_epoch(logs: list['MetricsLogger'],
+                                        names: list[str] | None = None,
+                                        metric_names: list[str] | None = None,
+                                        start_from_epoch: int = 1,
+                                        end_at_epoch: int | None = None):
+        COLORS = [("darkblue", "deepskyblue"), ("firebrick", "lightsalmon")] #TODO make it dynamic
+        # (a tuple of n colors for each log, where n is the number of metrics in metrics_to_plot)
+
+        #TODO adapt the changes on this method also to the non-static version (plot_metrics_by_epoch())
+        if len(logs) < 2:
+            raise ValueError("The argument 'logs' should contain at least 2 logs")
+        if names is None:
+            names = [log.name for log in logs]
+        if len(logs) != len(names):
+            raise ValueError("The number of logs and names do not correspond")
+        common_metrics = set(logs[0].get_logged_metric_names())
+        for log in logs:
+            common_metrics.intersection_update(log.get_logged_metric_names())
+        if metric_names is None:
+            metrics_to_plot = common_metrics
+        else:
+            missing_metrics = set()
+            for log in logs:
+                print(common_metrics, set(metric_names) - set(common_metrics), metric_names)
+                missing_metrics |= set(metric_names) - set(common_metrics)
+            if len(missing_metrics) > 0:
+                raise ValueError(f"The following metrics have not been logged in all the passed logs:"\
+                    f" {', '.join(list(missing_metrics))}")
+            metrics_to_plot = metric_names
+        
+        if end_at_epoch is None:
+            max_epoch = min([log.df.index.max() for log in logs])
+        else:
+            max_epoch = end_at_epoch
+
+        for i, log in enumerate(logs):
+            for j, metric_name in enumerate(metrics_to_plot):
+                if metric_name == "epoch_time (seconds)":
+                    continue
+                plt.plot(log.df.index[start_from_epoch:max_epoch],
+                        log.df[metric_name].iloc[start_from_epoch:max_epoch],
+                            label=metric_name + " - " + names[i],
+                            color=COLORS[i][j])
+        plt.xlabel('Epoch #')
+        plt.ylabel('MSE') #TODO
+        #plt.title('Metrics by Epoch')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
