@@ -9,6 +9,8 @@ import time
 METRICS_LOGGER_FOLDER = "metrics/logged_metrics/"
 EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
+TIMESTAMP_FORMAT = "%d-%m-%Y_%H-%M-%S"
+
 class EpochTimer:
     #TODO this timer considers also the stand-by time (idle) time
     def __init__(self, epoch_num: int):
@@ -28,16 +30,27 @@ class MetricsLogger:
     def __init__(self, name: str, automatic_save_after: int = 50,
                  df_metrics: pd.DataFrame | None = None,
                  verbose: bool = True) -> None:
-        self.name = name
-        self.automatic_save_after = automatic_save_after
         self.verbose = verbose
+        self.automatic_save_after = automatic_save_after
+        self.__epoch_timer = None
         if df_metrics is None:
+            self.name = name
+            self.timestamp = datetime.datetime.now().strftime(TIMESTAMP_FORMAT)
+
             self.__epoch_to_metrics = dict()
             self.__logged_metrics = set()
             self.__logging = True
             if self.verbose:
-                print(f"Logging {name}", end="")
+                print(f"Logging {self.name}", end="")
         else:
+            self.filename = name
+            self.name = " ".join(self.filename.split("_")[:-2])
+            timestamp_string = "_".join(self.filename.split(".csv")[0].split("_")[-2:])
+            try:
+                self.timestamp = datetime.datetime.strptime(timestamp_string, TIMESTAMP_FORMAT)
+            except:
+                print(self.filename, timestamp_string)
+
             self.__epoch_to_metrics = dict()
             for index, row in df_metrics.iterrows():
                 self.__epoch_to_metrics[index] = row.to_dict()
@@ -46,9 +59,7 @@ class MetricsLogger:
             self.df = df_metrics
             self.__logging = False
             if self.verbose:
-                print(f"Logged the following metrics for {name}: {self.get_logged_metric_names()}")
-        self.__epoch_timer = None
-        self.timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
+                print(f"Logged the following metrics for {self.name}: {self.get_logged_metric_names()}")
     
     def log_metric(self, epoch_num: int, metric_name: str, metric_value: float) -> None:
         # intermediate savings (TODO the logging boolean in this case doesn't make sense)
@@ -237,7 +248,7 @@ class MetricsLogger:
     @staticmethod
     def from_csv(filepath: str, verbose: bool = False):
         logs_df = pd.read_csv(filepath, header=0, index_col='epoch #')
-        metrics_logger = MetricsLogger(name=filepath.split("/")[1].split("_")[0],
+        metrics_logger = MetricsLogger(name=filepath.split("/")[-1],
                                        df_metrics=logs_df,
                                        verbose=verbose)
         return metrics_logger
