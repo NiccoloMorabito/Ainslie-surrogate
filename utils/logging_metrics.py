@@ -259,7 +259,8 @@ class MetricsLogger:
                                         metric_names: list[str] | None = None,
                                         start_from_epoch: int = 1,
                                         end_at_epoch: int | None = None):
-        COLORS = [("darkblue", "deepskyblue"), ("firebrick", "lightsalmon")] #TODO make it dynamic
+        COLORS = [("darkblue", "deepskyblue"), ("firebrick", "lightsalmon"),
+                  ("darkgreen", "limegreen")] #TODO make it dynamic
         # (a tuple of n colors for each log, where n is the number of metrics in metrics_to_plot)
 
         #TODO adapt the changes on this method also to the non-static version (plot_metrics_by_epoch())
@@ -283,6 +284,7 @@ class MetricsLogger:
                 raise ValueError(f"The following metrics have not been logged in all the passed logs:"\
                     f" {', '.join(list(missing_metrics))}")
             metrics_to_plot = metric_names
+        metrics_to_plot.remove(EPOCH_TIME_LABEL)
         
         if end_at_epoch is None:
             max_epoch = min([log.df.index.max() for log in logs])
@@ -291,8 +293,6 @@ class MetricsLogger:
 
         for i, log in enumerate(logs):
             for j, metric_name in enumerate(metrics_to_plot):
-                if metric_name == "epoch_time (seconds)":
-                    continue
                 plt.plot(log.df.index[start_from_epoch:max_epoch],
                         log.df[metric_name].iloc[start_from_epoch:max_epoch],
                             label=metric_name + " - " + names[i],
