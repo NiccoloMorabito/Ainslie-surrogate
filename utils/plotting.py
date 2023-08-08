@@ -106,6 +106,28 @@ def plot_maps(X, Y, original, predicted,
     fig.tight_layout()  # Adjust the spacing between subplots
     plt.show()
 
+def save_cut_maps(X, Y, original, predicted,
+              ti: float, ct: float, ws: int | None = None,
+              zlabel: str = "Wind Deficit", error_to_plot: str | None = None,
+              add_near_wake: bool = True, plot_wind_turbine: bool = True,
+              filepath: str = "ananas.png") -> None: #TODO DELETE THIS METHOD
+    assert X.shape == Y.shape, "X and Y grids have not the same shape"
+    assert original.shape == predicted.shape, "Original and predicted do not have the same shape"
+    max_deficit = max(original.max(), predicted.max())
+    levels = np.linspace(0, max_deficit, 5000)
+
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))  # Create a figure with two subplots
+
+    plot_submap(X, Y, predicted, zlabel=f"Predicted {zlabel}", levels=levels, ax=axs[0],
+                add_near_wake=add_near_wake, plot_wind_turbine=plot_wind_turbine)
+    if error_to_plot is not None:
+        plot_error_submap(X, Y, original, predicted, error_to_plot, ax=axs[1],
+                          add_near_wake=add_near_wake, plot_wind_turbine=plot_wind_turbine)
+    
+    fig.tight_layout()
+    plt.savefig(filepath, dpi=300)
+    plt.close()
+
 def plot_submap(X, Y, wake_field, zlabel: str = "Wind Deficit",
              levels = DEFICIT_LEVELS, cmap: str ='Blues', ax = None,
              add_near_wake: bool = True, plot_wind_turbine: bool = True) -> None:

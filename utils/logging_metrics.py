@@ -29,7 +29,7 @@ class MetricsLogger:
 
     def __init__(self, name: str, automatic_save_after: int = 50,
                  df_metrics: pd.DataFrame | None = None,
-                 verbose: bool = True) -> None:
+                 verbose: bool | int = True) -> None:
         self.verbose = verbose
         self.automatic_save_after = automatic_save_after
         self.__epoch_timer = None
@@ -72,7 +72,7 @@ class MetricsLogger:
             self.__start_epoch_timer(epoch_num)
 
             self.__epoch_to_metrics[epoch_num] = dict()
-            if self.verbose:
+            if self.verbose and epoch_num%self.verbose == 0:
                 print(f"\nEpoch {epoch_num} ->", end="\t")
             if self.__logged_metrics and metric_name not in self.__logged_metrics:
                 warnings.warn(
@@ -80,7 +80,7 @@ class MetricsLogger:
         
         self.__epoch_to_metrics[epoch_num][metric_name] = metric_value
         self.__logged_metrics.add(metric_name)
-        if self.verbose:
+        if self.verbose and epoch_num%self.verbose == 0:
             print(f"{metric_name}={metric_value}", end="\t")
     
     def __start_epoch_timer(self, epoch_num: int) -> None:
@@ -104,7 +104,7 @@ class MetricsLogger:
             return
         epoch_num = self.__epoch_timer.get_epoch_num()
         epoch_time = self.__epoch_timer.stop()
-        if self.verbose:
+        if self.verbose and self.verbose==1:
             print(f"{EPOCH_TIME_LABEL}={epoch_time}", end="\t")
         self.__epoch_timer = None
         self.__epoch_to_metrics[epoch_num][EPOCH_TIME_LABEL] = epoch_time
