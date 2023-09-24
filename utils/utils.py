@@ -4,7 +4,7 @@ import pandas as pd
 import xarray as xr
 import numpy as np
 
-def my_arange(start, end, step, include_end : bool = False) -> np.ndarray:
+def my_arange(start, end, step, include_end : bool = True) -> np.ndarray:
     """
     Function for np.arange(start, stop, step) without creating problems with the float representations
     """
