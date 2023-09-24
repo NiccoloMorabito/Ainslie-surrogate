@@ -26,7 +26,7 @@ echo "\nfrom .eddy_viscosity import EddyViscosityDeficitModel, EddyViscosityMode
 ```
 
 ## Data
-he data utilized for this project was generated using the [PyWake implementation](https://topfarm.pages.windenergy.dtu.dk/PyWake/) of the Eddy Viscosity (Ainslie) model [[1]](#1).
+The data utilized for this project was generated using the [PyWake implementation](https://topfarm.pages.windenergy.dtu.dk/PyWake/) of the Eddy Viscosity (Ainslie) model [[1]](#1).
 
 Relevant notebooks:
 * [`data_generation_ainslie.ipynb`](data_generation_ainslie.ipynb) - Data generation process;
