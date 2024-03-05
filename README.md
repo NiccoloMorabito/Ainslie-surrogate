@@ -9,7 +9,7 @@ This repository contains resources related to my thesis research on the developm
 For detailed information about the work, please refer to the [final report](<Master Thesis - Report.pdf>).
 
 ## Setup
-Install the required dependecies:
+Install the required dependencies:
 
 ```
 pip install -r requirements.txt
