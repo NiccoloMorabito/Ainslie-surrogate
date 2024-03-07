@@ -1,27 +1,42 @@
-import time
 import datetime
-import torch
-from torch.utils.data import DataLoader
+import time
+
 import gpytorch
-from sklearn.base import BaseEstimator
 import sklearn.metrics as metrics
+import torch
+from sklearn.base import BaseEstimator
+from torch.utils.data import DataLoader
+
 from utils.metrics import peak_signal_noise_ratio
 from utils.utils import save_metrics_to_csv
 
 MODEL_DESC = "model_description"
-PREDICTION_TIME = "prediction_time" # prediction time per simulation (i.e. whole wakefield)
+PREDICTION_TIME = (
+    "prediction_time"  # prediction time per simulation (i.e. whole wakefield)
+)
 TIMESTAMP = "timestamp"
 TRAINSET_CSV_FILEPATH = "metrics/final_results/trainset_results.csv"
 TESTSET_CSV_FILEPATH = "metrics/final_results/testset_results.csv"
 
-METRICS = [metrics.r2_score, metrics.explained_variance_score, metrics.mean_squared_error, \
-           metrics.mean_absolute_error, metrics.median_absolute_error, \
-            metrics.mean_absolute_percentage_error, peak_signal_noise_ratio]
-COLUMNS_ORDER = [MODEL_DESC, PREDICTION_TIME] + [metric.__name__ for metric in METRICS] + [TIMESTAMP]
+METRICS = [
+    metrics.r2_score,
+    metrics.explained_variance_score,
+    metrics.mean_squared_error,
+    metrics.mean_absolute_error,
+    metrics.median_absolute_error,
+    metrics.mean_absolute_percentage_error,
+    peak_signal_noise_ratio,
+]
+COLUMNS_ORDER = (
+    [MODEL_DESC, PREDICTION_TIME]
+    + [metric.__name__ for metric in METRICS]
+    + [TIMESTAMP]
+)
+
 
 def __get_predictions_groundtruths_time(
-        model,
-        dataloader: DataLoader)-> tuple[torch.Tensor, torch.Tensor, float]:
+    model, dataloader: DataLoader
+) -> tuple[torch.Tensor, torch.Tensor, float]:
     predictions = list()
     ground_truths = list()
     with torch.no_grad():
@@ -34,16 +49,18 @@ def __get_predictions_groundtruths_time(
     predictions = torch.cat(predictions, dim=0)
     ground_truths = torch.cat(ground_truths, dim=0)
     num_simulations = ground_truths.shape[0]
-    prediction_time = (end_time-start_time) / num_simulations
+    prediction_time = (end_time - start_time) / num_simulations
     return predictions, ground_truths, prediction_time
+
 
 def __get_predictions_time(model, test_x) -> tuple[torch.Tensor, float]:
     start_time = time.time()
     predictions = model.predict(test_x)
     end_time = time.time()
     num_simulations = test_x.shape[0]
-    prediction_time = (end_time-start_time) / num_simulations
+    prediction_time = (end_time - start_time) / num_simulations
     return predictions, prediction_time
+
 
 def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor, float]:
     with torch.no_grad(), gpytorch.settings.fast_pred_var():
@@ -51,12 +68,13 @@ def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor,
         predictions = likelihood(model(test_x))
         end_time = time.time()
     num_simulations = test_x.shape[0]
-    prediction_time = (end_time-start_time) / num_simulations
+    prediction_time = (end_time - start_time) / num_simulations
     return predictions, prediction_time
 
-def __compute_other_metrics(outputs, predictions,
-                            model_description: str,
-                            prediction_time: float) -> dict[str, float]: #TODO change name
+
+def __compute_other_metrics(
+    outputs, predictions, model_description: str, prediction_time: float
+) -> dict[str, float]:  # TODO change name
     metric_to_value = dict()
     for metric in METRICS:
         metric_to_value[metric.__name__] = metric(outputs, predictions)
@@ -67,37 +85,48 @@ def __compute_other_metrics(outputs, predictions,
     metric_to_value[TIMESTAMP] = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
     return metric_to_value
-    
 
-def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
-                   data_type : str,
-                   model_description: str,
-                   save_results: bool,
-                   experiment: str | None = None) -> None:
-    if data_type == 'train':
+
+def evaluate_model(
+    model,
+    data: DataLoader | tuple[torch.Tensor, torch.Tensor],
+    data_type: str,
+    model_description: str,
+    save_results: bool,
+    experiment: str | None = None,
+) -> None:
+    if data_type == "train":
         print("Train results for " + model_description)
         filepath = TRAINSET_CSV_FILEPATH
-    elif data_type == 'test':
+    elif data_type == "test":
         print("Test results for " + model_description)
         filepath = TESTSET_CSV_FILEPATH
     else:
         raise ValueError(f"dataloader_type must be 'train' or 'test', not {data_type}")
-    
+
     if experiment is not None:
         filepath = filepath.replace(".csv", "_" + experiment + ".csv")
         print(filepath)
-    
+
     # PyTorch model
     if isinstance(model, torch.nn.Module) and isinstance(data, DataLoader):
         dataloader = data
-        predictions, ground_truths, prediction_time = __get_predictions_groundtruths_time(model, dataloader)
+        predictions, ground_truths, prediction_time = (
+            __get_predictions_groundtruths_time(model, dataloader)
+        )
     # sklearn model
-    elif isinstance(model, BaseEstimator) and isinstance(data, tuple) and all(isinstance(item, torch.Tensor) for item in data):
+    elif (
+        isinstance(model, BaseEstimator)
+        and isinstance(data, tuple)
+        and all(isinstance(item, torch.Tensor) for item in data)
+    ):
         x, ground_truths = data
         predictions, prediction_time = __get_predictions_time(model, x)
     else:
-        raise ValueError("Unsupported model or data type. Pass a PyTorch, GpyTorch or "
-        "Sklearn model and a DataLoader or tuple of tensors.")
+        raise ValueError(
+            "Unsupported model or data type. Pass a PyTorch, GpyTorch or "
+            "Sklearn model and a DataLoader or tuple of tensors."
+        )
     """
     # GpyTorch model (not used for the moment, missing likelihood as parameter)
     elif isinstance(model, gpytorch.models.GP):
@@ -105,8 +134,9 @@ def evaluate_model(model, data: DataLoader | tuple[torch.Tensor, torch.Tensor],
         predictions, prediction_time = __get_predictions_time_gpy(model, likelihood, x)
     """
 
-    metrics = __compute_other_metrics(ground_truths, predictions,
-                                      model_description, prediction_time)    
+    metrics = __compute_other_metrics(
+        ground_truths, predictions, model_description, prediction_time
+    )
 
     if save_results:
         save_metrics_to_csv(filepath, metrics, COLUMNS_ORDER)
