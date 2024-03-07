@@ -8,8 +8,6 @@ from py_wake.utils.generic_power_ct_curves import standard_power_ct_curve
 from py_wake.wind_turbines import WindTurbine
 from py_wake.wind_turbines.power_ct_functions import PowerCtTabular
 
-"""PyWake utils"""
-
 
 def get_site(ti: float, ws: int) -> XRSite:
     # return XRSite(ds=xr.Dataset(data_vars={'WS': WS_RANGE, 'P': 1, 'TI': turbulence_intensity}, coords={'wd': WD_RANGE}))

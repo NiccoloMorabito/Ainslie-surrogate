@@ -8,8 +8,8 @@ import torch
 from numpy import ndarray
 from torch.utils.data import DataLoader, Dataset
 
-import utils.data_utils as data_utils
-import utils.utils as utils
+import src.data_utils as data_utils
+import src.utils as utils
 
 INPUT_VARIABLES = ["ti", "ct"]
 WS = "ws"

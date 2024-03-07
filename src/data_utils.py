@@ -40,7 +40,7 @@ def get_filepath(
     ti_step: float,
     ct_step: float,
 ) -> str:  # TODO more explaining method name
-    dir = get_dir_name(
+    folder = get_dir_name(
         x_start_factor,
         x_end_factor,
         y_start_factor,
@@ -50,7 +50,7 @@ def get_filepath(
         ct_step,
     )
     filename = f"ws_{wind_speed}.nc"
-    return os.path.join(dir, filename)
+    return os.path.join(folder, filename)
 
 
 def get_parameters_from(

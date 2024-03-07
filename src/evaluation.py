@@ -6,17 +6,21 @@ import sklearn.metrics as metrics
 import torch
 from sklearn.base import BaseEstimator
 from torch.utils.data import DataLoader
+import os
 
-from utils.metrics import peak_signal_noise_ratio
-from utils.utils import save_metrics_to_csv
+from src.metrics import peak_signal_noise_ratio
+from src.utils import save_metrics_to_csv
 
 MODEL_DESC = "model_description"
 PREDICTION_TIME = (
     "prediction_time"  # prediction time per simulation (i.e. whole wakefield)
 )
 TIMESTAMP = "timestamp"
-TRAINSET_CSV_FILEPATH = "metrics/final_results/trainset_results.csv"
-TESTSET_CSV_FILEPATH = "metrics/final_results/testset_results.csv"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TRAINSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics/final_results/trainset_results.csv")
+TESTSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics/final_results/testset_results.csv")
+
 
 METRICS = [
     metrics.r2_score,

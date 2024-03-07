@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import torch
 from matplotlib.patches import Ellipse
+import os
 from py_wake.wind_turbines import WindTurbine, WindTurbines
 
 DEFAULT_XLABEL = "Downwind distance [x/D]"
@@ -18,7 +19,8 @@ MAX_X = 30
 MIN_Y = -1.875
 MAX_Y = 1.875
 
-TURBINE_SYMBOL_PATH = "utils/turbine.png"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TURBINE_SYMBOL_PATH = os.path.join(BASE_DIR, "utils/turbine.png")
 
 
 def plot_ct_curve(turbines: list[WindTurbine]) -> None:

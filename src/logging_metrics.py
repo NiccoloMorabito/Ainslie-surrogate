@@ -7,7 +7,9 @@ import warnings
 import matplotlib.pyplot as plt
 import pandas as pd
 
-METRICS_LOGGER_FOLDER = "metrics/logged_metrics/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+METRICS_LOGGER_FOLDER = os.path.join(BASE_DIR, "metrics/logged_metrics/")
+
 EPOCH_TIME_LABEL = "epoch_time (seconds)"
 
 TIMESTAMP_FORMAT = "%d-%m-%Y_%H-%M-%S"
