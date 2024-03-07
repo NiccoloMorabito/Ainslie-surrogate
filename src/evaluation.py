@@ -18,8 +18,12 @@ PREDICTION_TIME = (
 TIMESTAMP = "timestamp"
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TRAINSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics", "final_results", "trainset_results.csv")
-TESTSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics", "final_results", "testset_results.csv")
+TRAINSET_CSV_FILEPATH = os.path.join(
+    BASE_DIR, "metrics", "final_results", "trainset_results.csv"
+)
+TESTSET_CSV_FILEPATH = os.path.join(
+    BASE_DIR, "metrics", "final_results", "testset_results.csv"
+)
 
 
 METRICS = [
