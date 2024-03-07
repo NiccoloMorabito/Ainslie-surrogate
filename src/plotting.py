@@ -19,8 +19,10 @@ MAX_X = 30
 MIN_Y = -1.875
 MAX_Y = 1.875
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TURBINE_SYMBOL_PATH = os.path.join(BASE_DIR, "utils/turbine.png")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(BASE_DIR)
+TURBINE_SYMBOL_PATH = os.path.join(BASE_DIR, "src/turbine.png")
+print(TURBINE_SYMBOL_PATH)
 
 
 def plot_ct_curve(turbines: list[WindTurbine]) -> None:

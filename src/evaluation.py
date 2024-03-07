@@ -17,9 +17,9 @@ PREDICTION_TIME = (
 )
 TIMESTAMP = "timestamp"
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-TRAINSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics/final_results/trainset_results.csv")
-TESTSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics/final_results/testset_results.csv")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TRAINSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics", "final_results", "trainset_results.csv")
+TESTSET_CSV_FILEPATH = os.path.join(BASE_DIR, "metrics", "final_results", "testset_results.csv")
 
 
 METRICS = [
@@ -99,17 +99,17 @@ def evaluate_model(
     save_results: bool,
     experiment: str | None = None,
 ) -> None:
-    if data_type == "train":
-        print("Train results for " + model_description)
-        filepath = TRAINSET_CSV_FILEPATH
-    elif data_type == "test":
-        print("Test results for " + model_description)
+    if data_type == "test":
+        print(f"Test results for {model_description}")
         filepath = TESTSET_CSV_FILEPATH
+    elif data_type == "train":
+        print(f"Train results for {model_description}")
+        filepath = TRAINSET_CSV_FILEPATH
     else:
         raise ValueError(f"dataloader_type must be 'train' or 'test', not {data_type}")
 
     if experiment is not None:
-        filepath = filepath.replace(".csv", "_" + experiment + ".csv")
+        filepath = filepath.replace(".csv", f"_{experiment}.csv")
         print(filepath)
 
     # PyTorch model

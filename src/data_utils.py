@@ -10,6 +10,8 @@ Y_NC = "y:D"
 X = "x/D"
 Y = "y/D"
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 
 def get_dir_name(
     x_start_factor: int,
@@ -20,14 +22,11 @@ def get_dir_name(
     ti_step: float,
     ct_step: float,
 ) -> str:
-    dir = (
-        f"data/discr_factors_x{x_start_factor}_{x_end_factor}_y{y_start_factor}_{y_end_factor}_"
-        + f"step{grid_step_factor}_TIstep{ti_step}_CTstep{ct_step}"
+    return os.path.join(
+        BASE_DIR,
+        "data",
+        f"discr_factors_x{x_start_factor}_{x_end_factor}_y{y_start_factor}_{y_end_factor}_step{grid_step_factor}_TIstep{ti_step}_CTstep{ct_step}",
     )
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-        os.makedirs(dir.replace("data/", "saved_models/"))  # TODO find a better way
-    return dir
 
 
 def get_filepath(
@@ -49,6 +48,9 @@ def get_filepath(
         ti_step,
         ct_step,
     )
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+        os.makedirs(folder.replace("data/", "saved_models/"))  # TODO find a better way
     filename = f"ws_{wind_speed}.nc"
     return os.path.join(folder, filename)
 
