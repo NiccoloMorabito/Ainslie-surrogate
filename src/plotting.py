@@ -1,3 +1,4 @@
+from typing import Optional
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
@@ -115,7 +116,7 @@ def plot_map(
     wake_field,
     ti: float,
     ct: float,
-    ws: int | None = None,
+    ws: Optional[int] = None,
     zlabel: str = "Wind Deficit",
     levels=DEFICIT_LEVELS,
     cmap: str = "Blues",
@@ -150,9 +151,9 @@ def plot_maps(
     predicted,
     ti: float,
     ct: float,
-    ws: int | None = None,
+    ws: Optional[int] = None,
     zlabel: str = "Wind Deficit",
-    error_to_plot: str | None = None,
+    error_to_plot: Optional[str] = None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
 ) -> None:
@@ -219,21 +220,25 @@ def save_cut_maps(
     predicted,
     ti: float,
     ct: float,
-    ws: int | None = None,
+    ws: Optional[int] = None,
     zlabel: str = "Wind Deficit",
-    error_to_plot: str | None = None,
+    error_to_plot: Optional[str] = None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
-    filepath: str = "ananas.png",
-) -> None:  # TODO DELETE THIS METHOD
+    filepath: Optional[str] = None,
+) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     assert (
         original.shape == predicted.shape
     ), "Original and predicted do not have the same shape"
+
+    filepath = (
+        filepath or f"TI{ti:.2f}_CT{ct:.2f}{f'_WS{str(ws)}' if ws else ''}.pdf"
+    )
     max_deficit = max(original.max(), predicted.max())
     levels = np.linspace(0, max_deficit, 5000)
 
-    fig, axs = plt.subplots(1, 2, figsize=(10, 4))  # Create a figure with two subplots
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
 
     plot_submap(
         X,
@@ -258,7 +263,7 @@ def save_cut_maps(
         )
 
     fig.tight_layout()
-    plt.savefig(filepath, dpi=300)
+    plt.savefig(filepath, bbox_inches="tight", format="pdf")
     plt.close()
 
 
@@ -357,7 +362,7 @@ def __plot_contour(
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
 ) -> None:
-    if not (add_near_wake or not plot_wind_turbine):
+    if not add_near_wake and plot_wind_turbine:
         raise ValueError("Cannot plot wind turbine without adding near-wake region.")
 
     show = False
