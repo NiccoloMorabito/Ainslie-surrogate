@@ -1,12 +1,11 @@
-# Data-driven Surrogate Models for Predicting Wind Turbine Wake Effects
-**Master Thesis for Big Data Management and Analytics**
+# Investigating data-driven surrogates for the Ainslie wake model
 
-**Author:** Niccolò Morabito  
-**Supervisors:** Erik Quaeghebeur & Laurens Bliek
+**Authors:**
+* Niccolò Morabito, email: morabito.niccolo@gmail.com
+* Erik Quaeghebeur, email: e.quaeghebeur@tue.nl
+* Laurens Bliek, email: l.bliek@tue.nl
 
-This repository contains resources related to my thesis research on the development and analysis of Ainslie surrogate models.
-
-For detailed information about the work, please refer to the [final report](<Master Thesis - Report.pdf>).
+This repository contains resources related to the publication of the work about machine learning surrogates for the Ainslie wake model. For detailed information about the work, please refer to the final paper.
 
 ## Setup
 Install the required dependencies:
@@ -29,20 +28,23 @@ echo "\nfrom .eddy_viscosity import EddyViscosityDeficitModel, EddyViscosityMode
 The data utilized for this project was generated using the [PyWake implementation](https://topfarm.pages.windenergy.dtu.dk/PyWake/) of the Eddy Viscosity (Ainslie) model [[1]](#1).
 
 Relevant notebooks:
-* [`data_generation_ainslie.ipynb`](data_generation_ainslie.ipynb) - Data generation process;
-* [`data_analysis.ipynb`](data_analysis.ipynb) - Data analysis and exploration.
+* [`ainslie_data_generation.ipynb`](notebooks/ainslie_data_generation.ipynb) - Data generation process;
+* [`data_analysis.ipynb`](notebooks/analysis/data_analysis.ipynb) - Data analysis and exploration.
+
+## Codebase
+The helper and utility code are located in the [`src/`](src/) folder.
 
 ## Models
-Multiple models have been developed in this study to compare their generalization capabilities. The code for the trained models can be found in the notebooks within the `learning/` folder. The trained model weights are saved in the `saved_models/` folder.
+Multiple models have been developed in this study to compare their generalization capabilities. The code for the trained models can be found in the notebooks within the [`notebooks/training/`](notebooks/training/) folder. The trained model weights are saved in the [`saved_models/`](saved_models/) folder.
 
 ## Results
-Different results obtained from experiments are saved in the `metrics/` folder:
-* `metrics/logged_metrics/` - Contains logged training information (e.g., training and validation loss values)
-* `metrics/final_results/` - Includes results from various interpolation and extrapolation experiments. Results are categorized based on whether they are from the train or test set and the type of experiment.
+Different results obtained from experiments are saved in the [`metrics/`](metrics/) folder:
+* [`metrics/logged_metrics/`](metrics/logged_metrics/) - Contains logged training information (e.g., training and validation loss values);
+* [`metrics/final_results/`](metrics/final_results/) - Includes results from various interpolation and extrapolation experiments. Results are categorized based on whether they are from the train or test set and the type of experiment.
 
 Relevant notebooks:
-* [`logged_metrics_analysis.ipynb`](logged_metrics_analysis.ipynb) - Analysis of logged metrics
-* [`result_analysis.ipynb`](result_analysis.ipynb) - Visualization, comparison, and further analysis of experiment results
+* [`logged_metrics_visualizations.ipynb`](notebooks/analysis/logged_metrics_visualizations.ipynb) - Visualizations of logged metrics;
+* [`result_analysis.ipynb`](notebooks/analysis/result_analysis.ipynb) - Visualization, comparison, and further analysis of experiment results.
 
 ## References
 <a id="1">[1]</a> John F. Ainslie, "Calculating the flowfield in the wake of wind turbines" (1988). Journal of Wind Engineering and Industrial Aerodynamics.
