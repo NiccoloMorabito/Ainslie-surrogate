@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 import pandas as pd
 import xarray as xr
@@ -114,12 +115,12 @@ def load_netcfd(
     data_folder: str,
     wind_speed: int,
     include_ws_column: bool = True,
-    x_scaled_range: tuple[int, int] | None = None,
-    y_scaled_range: tuple[int, int] | None = None,
-    ti_range: tuple[float, float] | None = None,
-    ct_range: tuple[float, float] | None = None,
-    input_var_to_reduction_factor: dict | None = None,
-    resolution_reduction_factor: int | None = None,
+    x_scaled_range: Optional[tuple[int, int]] = None,
+    y_scaled_range: Optional[tuple[int, int]] = None,
+    ti_range: Optional[tuple[float, float]] = None,
+    ct_range: Optional[tuple[float, float]] = None,
+    input_var_to_reduction_factor: Optional[dict] = None,
+    resolution_reduction_factor: Optional[int] = None,
 ) -> pd.DataFrame:
     filepath = os.path.join(data_folder, f"ws_{wind_speed}.nc")
     ds = xr.open_dataset(filepath)

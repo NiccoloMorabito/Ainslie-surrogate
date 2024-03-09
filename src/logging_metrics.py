@@ -2,6 +2,7 @@ import datetime
 import os
 import re
 import time
+from typing import Optional
 import warnings
 
 import matplotlib.pyplot as plt
@@ -36,8 +37,8 @@ class MetricsLogger:
         self,
         name: str,
         automatic_save_after: int = 50,
-        df_metrics: pd.DataFrame | None = None,
-        verbose: bool | int = True,
+        df_metrics: Optional[pd.DataFrame] = None,
+        verbose: bool = True,
     ) -> None:
         self.verbose = verbose
         self.automatic_save_after = automatic_save_after
@@ -138,7 +139,7 @@ class MetricsLogger:
 
     def plot_metrics_by_epoch(
         self,
-        metric_names: list[str] | None = None,
+        metric_names: Optional[list[str]] = None,
         all_in_one: bool = True,
         start_from_epoch: int = 1,
     ):
@@ -213,7 +214,7 @@ class MetricsLogger:
         filepath = self.__get_filepath()
         self.df.to_csv(filepath)
 
-    def save_metrics(self, filepath: str | None = None) -> None:
+    def save_metrics(self, filepath: Optional[str] = None) -> None:
         if self.__logging:
             self.__stop()
 
@@ -297,10 +298,10 @@ class MetricsLogger:
     @staticmethod
     def plot_many_logs_metrics_by_epoch(
         logs: list["MetricsLogger"],
-        names: list[str] | None = None,
-        metric_names: list[str] | None = None,
+        names: Optional[list[str]] = None,
+        metric_names: Optional[list[str]] = None,
         start_from_epoch: int = 1,
-        end_at_epoch: int | None = None,
+        end_at_epoch: Optional[int] = None,
     ):
         COLORS = [
             ("darkblue", "deepskyblue"),

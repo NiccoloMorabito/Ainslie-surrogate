@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Union
 import warnings
 from itertools import product
 
@@ -295,12 +296,12 @@ def get_wake_dataloaders(
     train_perc: float = 0.8,
     test_perc: float = 0.2,
     validation_perc: float = 0,
-    input_var_to_train_reduction_factor: dict[str, int] | None = None,
-    input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
+    input_var_to_train_reduction_factor: Optional[dict[str, int]] = None,
+    input_var_to_train_ranges: Optional[dict[str, list[tuple[float, float]]]] = None,
     scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),  # MinMaxScaler()
-    batch_size: int | None = None,
-    batch_multiplier: int | None = None,
-) -> tuple[DataLoader, DataLoader] | tuple[DataLoader, DataLoader, DataLoader]:
+    batch_size: Optional[int] = None,
+    batch_multiplier: Optional[int] = None,
+) -> Union[tuple[DataLoader, DataLoader], tuple[DataLoader, DataLoader, DataLoader]]:
     __check_train_params(
         consider_ws,
         train_perc,
@@ -346,8 +347,8 @@ def get_wake_datasets(
     train_perc: float = 0.8,
     test_perc: float = 0.2,
     validation_perc: float = 0,
-    input_var_to_train_reduction_factor: dict[str, int] | None = None,
-    input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
+    input_var_to_train_reduction_factor: Optional[dict[str, int]] = None,
+    input_var_to_train_ranges: Optional[dict[str, list[tuple[float, float]]]] = None,
     scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),
 ) -> list[WakeDataset]:
     __check_train_params(
@@ -435,11 +436,9 @@ def __load_and_split_data(
     train_perc: float = 0.8,
     test_perc: float = 0.2,
     validation_perc: float = 0,
-    input_var_to_train_reduction_factor: dict[str, int] | None = None,
-    input_var_to_train_ranges: dict[str, list[tuple[float, float]]] | None = None,
-) -> (
-    tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-):
+    input_var_to_train_reduction_factor: Optional[dict[str, int]] = None,
+    input_var_to_train_ranges: Optional[dict[str, list[tuple[float, float]]]] = None,
+) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """In this moment, the method loads the data either including wind speed or not:
     - if yes, the data from different wind speeds is loaded and wind speed becomes an input feature;
         (different train-test splits are done on values of wind speed)
@@ -478,9 +477,7 @@ def __load_and_split_data(
 
 def __load_and_split_data_by_speed(
     data_folder: str, test_perc: float = 0.2, valid_perc: float = 0
-) -> (
-    tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-):
+) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """
     Function to split the data in training, test and possibly validation sets
     according to the wind speed.
@@ -509,9 +506,7 @@ def __load_and_split_data_by_speed(
 
 def __load_and_split_data_by_speed_alternative(  # TODO change the name
     data_folder: str, test_perc: float = 0.2, valid_perc: float = 0
-) -> (
-    tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-):
+) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """
     Function to split the data in training, test and possibly validation sets
     according to wind speed, thrust coefficient and turbulence intensity
@@ -587,8 +582,8 @@ def __load_and_split_data_by_speed_alternative(  # TODO change the name
 def __build_set_for_different_ws(
     data_folder: str,
     wind_speeds: list[int],
-    tis: list[float] | None = None,
-    cts: list[float] | None = None,
+    tis: Optional[list[float]] = None,
+    cts: Optional[list[float]] = None,
 ) -> (
     pd.DataFrame
 ):  # TODO change name (still the previous one when no tis and cts were specified)
@@ -623,9 +618,7 @@ def __split_data_by_input_params_randomly(  # for interpolation
     train_perc: float = 0.8,
     test_perc: float = 0.2,
     validation_perc: float = 0,
-) -> (
-    tuple[pd.DataFrame, pd.DataFrame] | tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
-):
+) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
     """
     Function to split the data in training, test and possibly validation sets
     according to thrust coefficient and turbulence intensity

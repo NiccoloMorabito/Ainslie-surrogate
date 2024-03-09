@@ -1,5 +1,6 @@
 import datetime
 import time
+from typing import Optional, Union
 
 import gpytorch
 import sklearn.metrics as metrics
@@ -97,11 +98,11 @@ def __compute_other_metrics(
 
 def evaluate_model(
     model,
-    data: DataLoader | tuple[torch.Tensor, torch.Tensor],
+    data: Union[DataLoader, tuple[torch.Tensor, torch.Tensor]],
     data_type: str,
     model_description: str,
     save_results: bool,
-    experiment: str | None = None,
+    experiment: Optional[str] = None,
 ) -> None:
     if data_type == "test":
         print(f"Test results for {model_description}")
