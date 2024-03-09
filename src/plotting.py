@@ -23,6 +23,10 @@ MAX_Y = 1.875
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TURBINE_SYMBOL_PATH = os.path.join(BASE_DIR, "src/turbine.png")
 
+# CONTOUR PLOTS
+# TODO decide whether to use the same range of deficits for all the plots (like it's currently done in plot_maps)
+# TODO try using the log scale ?
+
 
 def plot_ct_curve(turbines: list[WindTurbine]) -> None:
     plt.xlabel("Wind speed [m/s]")
@@ -33,11 +37,6 @@ def plot_ct_curve(turbines: list[WindTurbine]) -> None:
         plt.plot(ws, wts.ct(ws, type=t), ".-", label=wts.name(t))
     plt.legend(loc=1)
     plt.show()
-
-
-# CONTOUR PLOTS
-# TODO decide whether to use the same range of deficits for all the plots (like it's currently done in plot_maps)
-# TODO try using the log scale ?
 
 
 def plot_deficit_map_from_df(
@@ -312,7 +311,7 @@ def plot_error_submap(
         cmap = "coolwarm"
         levels = np.linspace(
             -torch.max(diff_wake_field), torch.max(diff_wake_field), 5000
-        )  # TODO
+        )
     elif error_to_plot.lower() == "absolute":
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field)
         cmap = "Reds"

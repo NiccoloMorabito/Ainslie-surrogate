@@ -20,7 +20,7 @@ def get_wind_turbine(
     # for power ct function (similar to GenericWindTurbine but putting a constant ct)
     wsp_lst = np.arange(
         0.1, 30, 0.1
-    )  # TODO this parameter decides the number of elements in u, p and ct_lst
+    )  # this parameter decides the number of elements in u, p and ct_lst
     u, p, ct_lst = standard_power_ct_curve(
         power_norm,
         diameter,
@@ -47,9 +47,6 @@ def get_discretized_grid(
     y_end_factor: int,
     grid_step_factor: float,
 ) -> HorizontalGrid:
-    # TODO check the discretization
-    #   - see Javier thesis, appendix B in particular)
-    #   - see also datadriven wind turbine wake modelling via probabilistic ML (e.g. Fig. 3) to set these parameters
     x_range = np.arange(
         diameter * x_start_factor, diameter * x_end_factor, diameter * grid_step_factor
     )
@@ -88,7 +85,7 @@ def generate_wake_dataset(
         y=turbine_ys,  # wind turbine positions (setting also wt domain, i.e. the number of turbines)
         wd=wind_direction,  # Wind direction (None for default -> 0-360° in bins of 1°)
         ws=wind_speed,  # Wind speed (None for default -> 3-25 m/s in bins of 1 m/s)
-        # yaw=0                      # TODO try to change this parameter?
+        # yaw=0                      # yaw angle
         # h=None,                    # wind turbine heights (defaults to the heights defined in windTurbines)
         # type=0,                    # Wind turbine types
     )

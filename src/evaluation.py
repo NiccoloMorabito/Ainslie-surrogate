@@ -83,8 +83,8 @@ def __get_predictions_time_gpy(model, likelihood, test_x) -> tuple[torch.Tensor,
 
 def __compute_other_metrics(
     outputs, predictions, model_description: str, prediction_time: float
-) -> dict[str, float]:  # TODO change name
-    metric_to_value = dict()
+) -> dict[str, float]:
+    metric_to_value = {}
     for metric in METRICS:
         metric_to_value[metric.__name__] = metric(outputs, predictions)
         print(f"{metric.__name__}={metric(outputs, predictions)}")

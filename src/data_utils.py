@@ -39,7 +39,7 @@ def get_filepath(
     wind_speed: int,
     ti_step: float,
     ct_step: float,
-) -> str:  # TODO more explaining method name
+) -> str:
     folder = get_dir_name(
         x_start_factor,
         x_end_factor,
@@ -51,7 +51,9 @@ def get_filepath(
     )
     if not os.path.exists(folder):
         os.makedirs(folder)
-        os.makedirs(folder.replace("data/", "saved_models/"))  # TODO find a better way
+    saved_models_folder = folder.replace("data/", "saved_models/")
+    if not os.path.exists(saved_models_folder):
+        os.makedirs(saved_models_folder)
     filename = f"ws_{wind_speed}.nc"
     return os.path.join(folder, filename)
 
@@ -161,7 +163,7 @@ def load_netcfd(
     df = ds.to_dataframe().reset_index().rename(columns={X_NC: X, Y_NC: Y})
 
     if include_ws_column:
-        return df.rename(columns={"WS": "ws"})  # TODO
+        return df.rename(columns={"WS": "ws"})
     return df.drop("WS", axis=1)
 
 

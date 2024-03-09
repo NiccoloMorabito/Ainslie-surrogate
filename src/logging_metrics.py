@@ -17,7 +17,7 @@ TIMESTAMP_FORMAT = "%d-%m-%Y_%H-%M-%S"
 
 
 class EpochTimer:
-    # TODO this timer considers also the stand-by time (idle) time
+    # NOTE: this timer considers also the idle time
     def __init__(self, epoch_num: int):
         self.__epoch_num = epoch_num
         self.__start_time = time.time()
@@ -30,7 +30,6 @@ class EpochTimer:
         return int(end_time - self.__start_time)
 
 
-# TODO change the code considering that epoch_num starts at 0, so it would be more readable adding 1
 class MetricsLogger:
 
     def __init__(
@@ -47,7 +46,7 @@ class MetricsLogger:
             self.name = name
             self.timestamp = datetime.datetime.now().strftime(TIMESTAMP_FORMAT)
 
-            self.__epoch_to_metrics = dict()
+            self.__epoch_to_metrics = {}
             self.__logged_metrics = set()
             self.__logging = True
             if self.verbose:
@@ -60,14 +59,14 @@ class MetricsLogger:
                 self.timestamp = datetime.datetime.strptime(
                     timestamp_string, TIMESTAMP_FORMAT
                 )
-            except:
+            except Exception:
                 print(self.filename, timestamp_string)
 
-            self.__epoch_to_metrics = dict()
+            self.__epoch_to_metrics = {}
             for index, row in df_metrics.iterrows():
                 self.__epoch_to_metrics[index] = row.to_dict()
             self.__logged_metrics = set(self.__epoch_to_metrics[0].keys())
-            # TODO self.__logged_metrics.remove(EPOCH_TIME_LABEL)
+            # self.__logged_metrics.remove(EPOCH_TIME_LABEL)
             self.df = df_metrics
             self.__logging = False
             if self.verbose:
@@ -88,7 +87,7 @@ class MetricsLogger:
             # measure epoch time
             self.__start_epoch_timer(epoch_num)
 
-            self.__epoch_to_metrics[epoch_num] = dict()
+            self.__epoch_to_metrics[epoch_num] = {}
             if self.verbose and epoch_num % self.verbose == 0:
                 print(f"\nEpoch {epoch_num} ->", end="\t")
             if self.__logged_metrics and metric_name not in self.__logged_metrics:
@@ -102,20 +101,17 @@ class MetricsLogger:
             print(f"{metric_name}={metric_value}", end="\t")
 
     def __start_epoch_timer(self, epoch_num: int) -> None:
-        self.__check_previous_epochs_time(epoch_num)  # TODO
+        self.__check_previous_epochs_time(epoch_num)
         if self.__epoch_timer is not None:
             self.__end_epoch_timer()
         self.__epoch_timer = EpochTimer(epoch_num)
 
     def __check_previous_epochs_time(self, epoch_num: int) -> None:
-        # TODO this method should be deleted at some point (just to check for bugs currently)
         if epoch_num < 1:
             return
         for i in range(epoch_num - 1):
             if EPOCH_TIME_LABEL not in self.__epoch_to_metrics[i]:
-                warnings.warn(
-                    f"The epoch {i} has not been correctly stopped while executing epoch {epoch_num}"
-                )
+                warnings.warn(f"The epoch {i} has not been correctly stopped.")
 
     def __end_epoch_timer(self) -> None:
         if self.__epoch_timer is None:
@@ -231,15 +227,7 @@ class MetricsLogger:
         """Overall training time of the best model
         (i.e. overall time required for the best model to be obtained)"""
 
-        # TODO improve code to choose the metric according_to
-        found = False
-        for logged_metric in self.__logged_metrics:
-            if according_to in logged_metric:
-                according_to = logged_metric
-                found = True
-                break
-        if not found:
-            raise ValueError(f"The metric {according_to} has not been logged")
+        according_to = self.__find_according_to_metric(according_to)
 
         if self.__logging:
             self.__stop()
@@ -252,6 +240,17 @@ class MetricsLogger:
                 + f" and it took {training_time} seconds for training."
             )
         return training_time
+
+    def __find_according_to_metric(self, according_to: str):
+        found = False
+        for logged_metric in self.__logged_metrics:
+            if according_to in logged_metric:
+                according_to = logged_metric
+                found = True
+                break
+        if not found:
+            raise ValueError(f"The metric {according_to} has not been logged")
+        return according_to
 
     def __find_best_model_epoch(self, according_to: str) -> int:
         # considering that 'according_to' is a loss -> the smallest the better
@@ -290,10 +289,9 @@ class MetricsLogger:
     @staticmethod
     def from_csv(filepath: str, verbose: bool = False):
         logs_df = pd.read_csv(filepath, header=0, index_col="epoch #")
-        metrics_logger = MetricsLogger(
+        return MetricsLogger(
             name=filepath.split("/")[-1], df_metrics=logs_df, verbose=verbose
         )
-        return metrics_logger
 
     @staticmethod
     def plot_many_logs_metrics_by_epoch(
@@ -324,7 +322,7 @@ class MetricsLogger:
             metrics_to_plot = common_metrics
         else:
             missing_metrics = set()
-            for log in logs:
+            for _ in logs:
                 print(
                     common_metrics,
                     set(metric_names) - set(common_metrics),
@@ -340,7 +338,7 @@ class MetricsLogger:
         metrics_to_plot.remove(EPOCH_TIME_LABEL)
 
         if end_at_epoch is None:
-            max_epoch = min([log.df.index.max() for log in logs])
+            max_epoch = min(log.df.index.max() for log in logs)
         else:
             max_epoch = end_at_epoch
 
@@ -353,7 +351,7 @@ class MetricsLogger:
                     color=COLORS[i][j],
                 )
         plt.xlabel("Epoch #")
-        plt.ylabel("MSE")  # TODO
+        plt.ylabel("MSE")
         # plt.title('Metrics by Epoch')
         plt.legend()
         plt.grid(True)

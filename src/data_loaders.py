@@ -6,11 +6,26 @@ from itertools import product
 import numpy as np
 import pandas as pd
 import torch
-from numpy import ndarray
 from torch.utils.data import DataLoader, Dataset
 
 import src.data_utils as data_utils
 import src.utils as utils
+from src.scalers import RangeScaler
+
+# DISCLAIMER: The code in this file is very dirty and it would need some refactoring and documentation.
+# It is planned to clean up and refactor the code to improve readability and maintainability + add documentation.
+
+# TODO the following things should be minded to clean and clarify the code:
+# - explain the arguments of the different functions
+# - explain univariate and multivariate as consequence of coords_as_input
+# - fix the different methods for __(load_and)_split_data_* (versions for ws, versions without ws) (start from __load_and_split_data() method)
+#   - distinguish among extrapolation and interpolation clearly
+#   - try to standardize the extrapolation code
+#   - make "consider ws" something standard and clear (not "WS in INPUT_VARIABLES")
+# - fix the INPUT_VARIABLES list
+# - create two subclasses for WakeDataset (one for univariate, one for multivariate) so that the different methods can be distinguished (preparation and get_params_for_plotting)
+#   - perhaps implementing a different indexing for univariate, at least an additional one doing:
+# - fix the possible confusion between x and y (input and output of th emodel) and coordinates x and y or the meshgrids X and Y
 
 INPUT_VARIABLES = ["ti", "ct"]
 WS = "ws"
@@ -26,58 +41,15 @@ INPUT_VARIABLE_TO_RANGE = {
 }
 
 TI_CT_DEFAULT_REDUC_FACTOR = 4
-
-# TODO move this scaler somewhere else
-from sklearn.base import BaseEstimator, TransformerMixin
-
-
-class RangeScaler(BaseEstimator, TransformerMixin):
-    def __init__(self, var_to_range: dict[str, tuple[float, float]]):
-        super(RangeScaler).__init__()
-        self.var_to_range = var_to_range
-        # desired new min and max values
-        self.min = 0
-        self.max = 1
-
-    def fit(self, X, y=None):
-        return self
-
-    def transform(self, X: pd.DataFrame):
-        scaled_X = X.copy()
-        # for var, range in self.var_to_range.items():
-        for var in X.columns:
-            original_min, original_max = self.var_to_range[var]
-            scaled_X[var] = (
-                (X[var] - original_min) / (original_max - original_min)
-            ) * (self.max - self.min) + self.min
-        return scaled_X.values
-
-    def fit_transform(self, X: pd.DataFrame, y=None) -> ndarray:
-        return self.transform(X)
-
-
-# TODO clean and clarify all this code, explaining:
-# - the arguments of the different functions
-# - univariate and multivariate as consequence of coords_as_input
-# - fix the different methods for __(load_and)_split_data_* (versions for ws, versions without ws) (start from __load_and_split_data() method)
-#   - distinguish among extrapolation and interpolation clearly
-#   - try to standardize the extrapolation code
-# TODO fix the INPUT_VARIABLES list
+DEFAULT_WS = 12
 
 
 class WakeDataset(Dataset):
-    # TODO make "consider ws" something standard and clear (not "WS in INPUT_VARIABLES")
-    # TODO create two subclasses for univariate and multivariate:
-    # so that the different methods can be distinguished (preparation and get_params_for_plotting)
-    # do maybe a different indexing for univariate, at least an additional one doing:
-    #   self.unscaled_inputs[index:index+self.num_cells]
-    # TODO there is confusion between x and y (i.e. input and output of the model)
-    # and x and y as coordinates (in input) or the meshgrids X and Y
     def __init__(
         self,
         df: pd.DataFrame,
         coords_as_input: bool,
-        scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),  # MinMaxScaler()
+        scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),
     ) -> None:
         super().__init__()
         self.__df = df
@@ -95,8 +67,6 @@ class WakeDataset(Dataset):
         assert len(self.inputs) == len(self.outputs)
 
     def __prepare_univariate(self) -> None:
-        # TODO change name and/or explain this approach
-
         # ordering to have a wake field ordered in the self.num_cells value by coords
         self.__input_vars_names = INPUT_VARIABLES + COORDS_VARIABLES
         self.__df = self.__df.sort_values(by=self.__input_vars_names)
@@ -117,8 +87,6 @@ class WakeDataset(Dataset):
         self.Y_grid = Ys.reshape(trasp_shape)
 
     def __prepare_multivariate(self) -> None:
-        # TODO change name and/or explain this approach
-
         self.__input_vars_names = INPUT_VARIABLES
 
         # Group by input features and create input and output tensors
@@ -214,14 +182,14 @@ class WakeDataset(Dataset):
         return ti, ct, ws, wake_field, predicted_wake_field
 
 
-class DeficitDataset(WakeDataset):  # TODO either delete or merge with WakeDataset
+class DeficitDataset(WakeDataset):
     """Dataset for individual instances of the wake simulation (not the entire grid)"""
 
     def __init__(
         self,
         df: pd.DataFrame,
         coords_as_input: bool,
-        scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),  # MinMaxScaler()
+        scaler=RangeScaler(INPUT_VARIABLE_TO_RANGE),
     ) -> None:
         # super().__init__()
         self.__df = df
@@ -326,8 +294,7 @@ def get_wake_dataloaders(
     if coords_as_input:  # batch size conversion in univariate
         try:
             batch_size = batch_multiplier * datasets[0].num_cells
-        # this is for when the wake field is not complete (i.e. DeficitDataset)
-        # TODO remove or fix it
+        # this is for when the wake field is not complete (i.e. DeficitDataset) TODO fix it
         except Exception:
             batch_size = batch_multiplier * 500
 
@@ -458,13 +425,12 @@ def __load_and_split_data(
     else:
         if WS in INPUT_VARIABLES:
             INPUT_VARIABLES.remove(WS)
-        # random ws in case ws is not important TODO make it more understandable
-        random_ws = 12
+
         df = data_utils.load_netcfd(
-            data_folder, wind_speed=random_ws, include_ws_column=True
+            data_folder, wind_speed=DEFAULT_WS, include_ws_column=True
         )
-        # TODO choose one of the following possibilities
         if input_var_to_train_reduction_factor is not None:
+            # TODO choose one of the following possibilities
             return __split_data_by_input_vars_uniformly(
                 df, input_var_to_train_reduction_factor
             )
@@ -590,9 +556,7 @@ def __build_set_for_different_ws(
     wind_speeds: list[int],
     tis: Optional[list[float]] = None,
     cts: Optional[list[float]] = None,
-) -> (
-    pd.DataFrame
-):  # TODO change name (still the previous one when no tis and cts were specified)
+) -> pd.DataFrame:
     ti_range = (min(tis), max(tis)) if tis else None
     ct_range = (min(cts), max(cts)) if cts else None
 
@@ -612,7 +576,7 @@ def __build_set_for_different_ws(
                 ct_range=ct_range,
             )
             data_frames.append(df)
-        except Exception as e:  # TODO temporary code for non-working files
+        except Exception as e:
             print(f"Error loading data for wind speed {wind_speed}", e)
 
     return pd.concat(data_frames)
@@ -792,7 +756,7 @@ def __split_data_by_input_vars_cutting(  # for extrapolation
 
 
 def __dataframes_to_datasets(dfs, coords_as_input: bool, scaler):
-    # if the wake field is not complete #TODO make this check more solid and elegant
+    # if the wake field is not complete
     if (
         not dfs[0][COORDS_VARIABLES]
         .drop_duplicates()
