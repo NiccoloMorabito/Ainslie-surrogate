@@ -232,9 +232,7 @@ def save_cut_maps(
         original.shape == predicted.shape
     ), "Original and predicted do not have the same shape"
 
-    filepath = (
-        filepath or f"TI{ti:.2f}_CT{ct:.2f}{f'_WS{str(ws)}' if ws else ''}.pdf"
-    )
+    filepath = filepath or f"TI{ti:.2f}_CT{ct:.2f}{f'_WS{str(ws)}' if ws else ''}.pdf"
     max_deficit = max(original.max(), predicted.max())
     levels = np.linspace(0, max_deficit, 5000)
 

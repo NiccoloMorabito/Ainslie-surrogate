@@ -122,8 +122,8 @@ class WakeDataset(Dataset):
         self.__input_vars_names = INPUT_VARIABLES
 
         # Group by input features and create input and output tensors
-        inputs = list()
-        outputs = list()
+        inputs = []
+        outputs = []
         for group, data in self.__df.groupby(self.__input_vars_names):
             input_tensor = torch.FloatTensor(group)
             inputs.append(input_tensor)
@@ -328,7 +328,7 @@ def get_wake_dataloaders(
             batch_size = batch_multiplier * datasets[0].num_cells
         # this is for when the wake field is not complete (i.e. DeficitDataset)
         # TODO remove or fix it
-        except:
+        except Exception:
             batch_size = batch_multiplier * 500
 
     training_dataloader = DataLoader(datasets[0], batch_size, shuffle=True)
@@ -438,7 +438,9 @@ def __load_and_split_data(
     validation_perc: float = 0,
     input_var_to_train_reduction_factor: Optional[dict[str, int]] = None,
     input_var_to_train_ranges: Optional[dict[str, list[tuple[float, float]]]] = None,
-) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+) -> Union[
+    tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+]:
     """In this moment, the method loads the data either including wind speed or not:
     - if yes, the data from different wind speeds is loaded and wind speed becomes an input feature;
         (different train-test splits are done on values of wind speed)
@@ -477,7 +479,9 @@ def __load_and_split_data(
 
 def __load_and_split_data_by_speed(
     data_folder: str, test_perc: float = 0.2, valid_perc: float = 0
-) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+) -> Union[
+    tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+]:
     """
     Function to split the data in training, test and possibly validation sets
     according to the wind speed.
@@ -487,9 +491,9 @@ def __load_and_split_data_by_speed(
     ), "You need to pass a folder to load all the files in it"
     files = os.listdir(data_folder)
     assert len(files) > 0, "No files in this directory"
-    files = set([file for file in files if not file.startswith(".")])
+    files = {file for file in files if not file.startswith(".")}
     assert all(
-        [file.endswith(".nc") and file.startswith("ws_") for file in files]
+        file.endswith(".nc") and file.startswith("ws_") for file in files
     ), "All the files in the specified folder should be nc for xarray dataset of a specific wind speed"
     wind_speeds = [int(file.split(".nc")[0].split("_")[1]) for file in files]
 
@@ -506,7 +510,9 @@ def __load_and_split_data_by_speed(
 
 def __load_and_split_data_by_speed_alternative(  # TODO change the name
     data_folder: str, test_perc: float = 0.2, valid_perc: float = 0
-) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+) -> Union[
+    tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+]:
     """
     Function to split the data in training, test and possibly validation sets
     according to wind speed, thrust coefficient and turbulence intensity
@@ -520,9 +526,9 @@ def __load_and_split_data_by_speed_alternative(  # TODO change the name
     ), "You need to pass a folder to load all the files in it"
     files = os.listdir(data_folder)
     assert len(files) > 0, "No files in this directory"
-    files = set([file for file in files if not file.startswith(".")])
+    files = {file for file in files if not file.startswith(".")}
     assert all(
-        [file.endswith(".nc") and file.startswith("ws_") for file in files]
+        file.endswith(".nc") and file.startswith("ws_") for file in files
     ), "All the files in the specified folder should be nc for xarray dataset of a specific wind speed"
     wind_speeds = [int(file.split(".nc")[0].split("_")[1]) for file in files]
     ti_step, ct_step = data_utils.get_TIstep_from(
@@ -609,8 +615,7 @@ def __build_set_for_different_ws(
         except Exception as e:  # TODO temporary code for non-working files
             print(f"Error loading data for wind speed {wind_speed}", e)
 
-    result = pd.concat(data_frames)
-    return result
+    return pd.concat(data_frames)
 
 
 def __split_data_by_input_params_randomly(  # for interpolation
@@ -618,7 +623,9 @@ def __split_data_by_input_params_randomly(  # for interpolation
     train_perc: float = 0.8,
     test_perc: float = 0.2,
     validation_perc: float = 0,
-) -> Union[tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
+) -> Union[
+    tuple[pd.DataFrame, pd.DataFrame], tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+]:
     """
     Function to split the data in training, test and possibly validation sets
     according to thrust coefficient and turbulence intensity
@@ -656,22 +663,26 @@ def __split_data_by_input_vars_uniformly(  # for interpolation
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_var_values = []
 
-    vars = list()
+    variables = []
     for input_var, reduction_factor in input_var_to_train_reduction_factor.items():
         values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
         train_values = list(values[::reduction_factor])
-        vars.append(input_var)
+        variables.append(input_var)
         train_var_values.append(train_values)
 
-    train_input_combs = pd.DataFrame(list(product(*train_var_values)), columns=vars)
+    train_input_combs = pd.DataFrame(
+        list(product(*train_var_values)), columns=variables
+    )
 
-    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
+    input_combs = (
+        df[variables].drop_duplicates().sort_values(by=variables).reset_index(drop=True)
+    )
     remaining_input_combs = pd.merge(
-        input_combs, train_input_combs, on=vars, how="left", indicator=True
+        input_combs, train_input_combs, on=variables, how="left", indicator=True
     )
     remaining_input_combs = remaining_input_combs[
         remaining_input_combs["_merge"] == "left_only"
-    ][vars]
+    ][variables]
 
     valid_input_combs = remaining_input_combs.iloc[::2]
     test_input_combs = remaining_input_combs.iloc[1::2]
@@ -682,7 +693,7 @@ def __split_data_by_input_vars_uniformly(  # for interpolation
 
     dfs = []
     for split_input_combs in [train_input_combs, valid_input_combs, test_input_combs]:
-        split_df = pd.merge(split_input_combs, df, on=vars, how="inner")
+        split_df = pd.merge(split_input_combs, df, on=variables, how="inner")
         dfs.append(split_df)
 
     return tuple(dfs)
@@ -719,14 +730,14 @@ def __split_data_by_input_vars_uniformly_exclusive(  # for interpolation 2
     test_list = [t[2] for t in split_var_values]
 
     dfs = []
-    vars = list(input_var_to_train_reduction_factor.keys())
+    variables = list(input_var_to_train_reduction_factor.keys())
     for split in [train_list, valid_list, test_list]:
         split_input_combs = (
-            pd.DataFrame(list(product(*split)), columns=vars)
-            .sort_values(by=vars)
+            pd.DataFrame(list(product(*split)), columns=variables)
+            .sort_values(by=variables)
             .reset_index(drop=True)
         )
-        split_df = pd.merge(split_input_combs, df, on=vars, how="inner")
+        split_df = pd.merge(split_input_combs, df, on=variables, how="inner")
         dfs.append(split_df)
 
     return tuple(dfs)
@@ -737,10 +748,10 @@ def __split_data_by_input_vars_cutting(  # for extrapolation
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     train_var_values = []
 
-    vars = list()
+    variables = []
     for input_var, train_ranges in input_var_to_train_ranges.items():
         values = df[input_var].drop_duplicates().sort_values().reset_index(drop=True)
-        train_values = list()
+        train_values = []
 
         for train_range in train_ranges:
             min_value, max_value = train_range
@@ -748,18 +759,22 @@ def __split_data_by_input_vars_cutting(  # for extrapolation
                 value for value in values if min_value <= value <= max_value
             ]
 
-        vars.append(input_var)
+        variables.append(input_var)
         train_var_values.append(train_values)
 
-    train_input_combs = pd.DataFrame(list(product(*train_var_values)), columns=vars)
+    train_input_combs = pd.DataFrame(
+        list(product(*train_var_values)), columns=variables
+    )
 
-    input_combs = df[vars].drop_duplicates().sort_values(by=vars).reset_index(drop=True)
+    input_combs = (
+        df[variables].drop_duplicates().sort_values(by=variables).reset_index(drop=True)
+    )
     remaining_input_combs = pd.merge(
-        input_combs, train_input_combs, on=vars, how="left", indicator=True
+        input_combs, train_input_combs, on=variables, how="left", indicator=True
     )
     remaining_input_combs = remaining_input_combs[
         remaining_input_combs["_merge"] == "left_only"
-    ][vars]
+    ][variables]
 
     valid_input_combs = remaining_input_combs.iloc[::2]
     test_input_combs = remaining_input_combs.iloc[1::2]
@@ -770,7 +785,7 @@ def __split_data_by_input_vars_cutting(  # for extrapolation
 
     dfs = []
     for split_input_combs in [train_input_combs, valid_input_combs, test_input_combs]:
-        split_df = pd.merge(split_input_combs, df, on=vars, how="inner")
+        split_df = pd.merge(split_input_combs, df, on=variables, how="inner")
         dfs.append(split_df)
 
     return tuple(dfs)
