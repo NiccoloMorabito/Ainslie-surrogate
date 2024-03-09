@@ -12,4 +12,4 @@ torch==2.0.0
 tqdm==4.64.1
 xarray==2023.3.0
 xgboost==1.7.6
-seaborn
+seaborn==0.12.2
