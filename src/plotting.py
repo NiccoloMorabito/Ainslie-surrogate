@@ -155,11 +155,15 @@ def plot_maps(
     error_to_plot: Optional[str] = None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
+    log_scale: bool = True, #TODO not for the error, at least change the name
+    save_path: Optional[str] = None,
 ) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     assert (
         original.shape == predicted.shape
     ), "Original and predicted do not have the same shape"
+
+    plt.rcParams['font.size'] = 11 #TODO move to the top (?)
     max_deficit = max(original.max(), predicted.max())
     levels = np.linspace(0, max_deficit, 5000)
 
@@ -181,6 +185,7 @@ def plot_maps(
         ax=axs[0],
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
+        log_scale=log_scale,
     )
     plot_submap(
         X,
@@ -191,6 +196,7 @@ def plot_maps(
         ax=axs[1],
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
+        log_scale=log_scale,
     )
     if error_to_plot is not None:
         plot_error_submap(
@@ -209,6 +215,8 @@ def plot_maps(
         suptitle += f", WS={ws}"
     fig.suptitle(suptitle, fontsize=16)  # Main title for all the images
     fig.tight_layout()  # Adjust the spacing between subplots
+    if save_path is not None:
+        plt.savefig(save_path, bbox_inches="tight", format="pdf")
     plt.show()
 
 
@@ -274,6 +282,7 @@ def plot_submap(
     ax=None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
+    log_scale: bool = False,
 ) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     if wake_field.dim() == 1:
@@ -291,6 +300,7 @@ def plot_submap(
         ax=ax,
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
+        log_scale=log_scale,
     )
 
 
@@ -305,12 +315,11 @@ def plot_error_submap(
     plot_wind_turbine: bool = True,
 ) -> None:
     # TODO standardize the levels for a better comparison?
-    # TODO standardize torch and numpy use
     if error_to_plot.lower() == "signed":
         diff_wake_field = original_wake_field - predicted_wake_field
         cmap = "coolwarm"
         levels = np.linspace(
-            -torch.max(diff_wake_field), torch.max(diff_wake_field), 5000
+            torch.min(diff_wake_field), torch.max(diff_wake_field), 5000
         )
     elif error_to_plot.lower() == "absolute":
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field)
@@ -323,10 +332,20 @@ def plot_error_submap(
         )
         cmap = "Reds"
         levels = np.linspace(0, torch.max(diff_wake_field), 5000)
+    elif error_to_plot.lower() == "absolute percentage":
+        diff_wake_field = 100 * torch.abs((predicted_wake_field - original_wake_field) / original_wake_field)
+        cmap = "Reds"
+        levels = np.linspace(0, torch.max(diff_wake_field), 5000)
+    elif error_to_plot.lower() == "signed percentage":
+        diff_wake_field = 100 * (predicted_wake_field - original_wake_field) / original_wake_field
+        cmap = "coolwarm"
+        levels = np.linspace(torch.min(diff_wake_field), torch.max(diff_wake_field), 5000)
+        #print(diff_wake_field.shape, diff_wake_field.min().item(), diff_wake_field.max().item())
+        #prova_percentage_error(diff_wake_field, ax, f"{error_to_plot.capitalize()} Deficit Error")
     else:
         raise ValueError(
             f"Invalid type_of_error: {error_to_plot}. "
-            + "Expected 'signed', 'absolute', or 'relative'."
+            + "Expected one of the following: ['signed', 'absolute', 'relative', 'absolute percentage', 'signed percentage']"
         )
     zlabel = f"{error_to_plot.capitalize()} Deficit Error"
     if torch.max(diff_wake_field) == 0.0:
@@ -344,6 +363,24 @@ def plot_error_submap(
         plot_wind_turbine=plot_wind_turbine,
     )
 
+"""
+def prova_percentage_error(errors, ax, zlabel):
+    import matplotlib.colors as colors
+
+
+    # Create a diverging colormap
+    cmap = plt.get_cmap('coolwarm')
+
+    # Create a logarithmic color scale
+    print(errors.min().item(), errors.max().item())
+    norm = colors.LogNorm(vmin=errors.min().item(), vmax=errors.max().item())
+
+    # Plot the contour map
+    c = ax.contourf(errors, cmap=cmap, norm=norm)
+
+    # Add a colorbar
+    plt.colorbar(c, label=zlabel, ax=ax)
+"""
 
 def __plot_contour(
     X,
@@ -358,6 +395,7 @@ def __plot_contour(
     ax=None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
+    log_scale: bool = False,
 ) -> None:
     if not add_near_wake and plot_wind_turbine:
         raise ValueError("Cannot plot wind turbine without adding near-wake region.")
@@ -381,13 +419,25 @@ def __plot_contour(
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)
-    # Set aspect ratio to 1:1
-    # print(X.max() - X.min(), Y.max() - Y.min(), (X.max() - X.min()) / (Y.max() - Y.min()))
-    # ax.set_aspect((X.max() - X.min()) / (Y.max() - Y.min()))
-    c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
+
+    import matplotlib.ticker as ticker
+    import matplotlib.colors as colors #TODO move to the top
+    if log_scale:
+        norm=colors.LogNorm(vmin=np.nanmin(Z), vmax=np.nanmax(Z))
+        c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
+    else:
+        c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
     ax.set_xlim([MIN_X, MAX_X])
     ax.set_ylim([MIN_Y, MAX_Y])
-    plt.colorbar(c, label=zlabel, ax=ax)
+
+
+
+    cbar = plt.colorbar(c, label=zlabel, ax=ax)
+    #plt.colorbar(c, label=zlabel, ax=ax, ticks=[levels.min(), levels.max()]) ##TODO remove
+
+    cbar.locator = ticker.MaxNLocator(nbins=6)  # Set maximum number of ticks
+    cbar.update_ticks()
+
     if show:
         plt.show()
 
@@ -396,42 +446,3 @@ def __plot_standard_wind_turbine(ax):
     image = mpimg.imread(TURBINE_SYMBOL_PATH)
     image = np.rot90(image, k=1)
     ax.imshow(image, extent=[-0.5, 0.5, -0.5, 0.5], aspect="auto", zorder=10)
-
-
-def __plot_standard_wind_turbine_MANUAL(ax):
-    X = 0
-    Y = 0
-    WD = 270
-    D = 1  # diameter is 1 after normalization
-    YAW = 0
-    TILT = 90
-    TURBINE_COLOR = "k"  # or 'gray'
-
-    """
-    #PyWake way of plotting turbine as a line
-    simple_line = Ellipse((X, Y), D * np.sin(np.deg2rad(TILT)), D, angle=90-WD+YAW,
-                          ec=TURBINE_COLOR, fc="None")
-    ax.add_artist(simple_line)
-    ax.plot(X, Y, '.', color=TURBINE_COLOR)
-    """
-
-    width = D * np.sin(np.deg2rad(TILT))
-    ellipse_down = Ellipse(
-        (X, Y - D / 4),
-        width=width,
-        height=D / 2,
-        angle=90 - WD + YAW,
-        ec=TURBINE_COLOR,
-        fc="None",
-    )
-    ellipse_up = Ellipse(
-        (X, Y + D / 4),
-        width=width,
-        height=D / 2,
-        angle=90 - WD + YAW,
-        ec=TURBINE_COLOR,
-        fc="None",
-    )
-    ax.add_artist(ellipse_down)
-    ax.add_artist(ellipse_up)
-    ax.plot(X, Y, ".", color=TURBINE_COLOR)
