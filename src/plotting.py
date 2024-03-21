@@ -155,7 +155,7 @@ def plot_maps(
     error_to_plot: Optional[str] = None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
-    log_scale: bool = True, #TODO not for the error, at least change the name
+    log_scale: bool = True,  # TODO not for the error, at least change the name
     save_path: Optional[str] = None,
 ) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
@@ -163,7 +163,7 @@ def plot_maps(
         original.shape == predicted.shape
     ), "Original and predicted do not have the same shape"
 
-    plt.rcParams['font.size'] = 11 #TODO move to the top (?)
+    plt.rcParams["font.size"] = 11  # TODO move to the top (?)
     max_deficit = max(original.max(), predicted.max())
     levels = np.linspace(0, max_deficit, 5000)
 
@@ -216,7 +216,7 @@ def plot_maps(
     fig.suptitle(suptitle, fontsize=16)  # Main title for all the images
     fig.tight_layout()  # Adjust the spacing between subplots
     if save_path is not None:
-        plt.savefig(save_path, bbox_inches="tight", format="pdf")
+        plt.savefig(save_path, bbox_inches="tight", dpi=300)
     plt.show()
 
 
@@ -268,7 +268,7 @@ def save_cut_maps(
         )
 
     fig.tight_layout()
-    plt.savefig(filepath, bbox_inches="tight", format="pdf")
+    plt.savefig(filepath, bbox_inches="tight", dpi=300)
     plt.close()
 
 
@@ -333,15 +333,21 @@ def plot_error_submap(
         cmap = "Reds"
         levels = np.linspace(0, torch.max(diff_wake_field), 5000)
     elif error_to_plot.lower() == "absolute percentage":
-        diff_wake_field = 100 * torch.abs((predicted_wake_field - original_wake_field) / original_wake_field)
+        diff_wake_field = 100 * torch.abs(
+            (predicted_wake_field - original_wake_field) / original_wake_field
+        )
         cmap = "Reds"
         levels = np.linspace(0, torch.max(diff_wake_field), 5000)
     elif error_to_plot.lower() == "signed percentage":
-        diff_wake_field = 100 * (predicted_wake_field - original_wake_field) / original_wake_field
+        diff_wake_field = (
+            100 * (predicted_wake_field - original_wake_field) / original_wake_field
+        )
         cmap = "coolwarm"
-        levels = np.linspace(torch.min(diff_wake_field), torch.max(diff_wake_field), 5000)
-        #print(diff_wake_field.shape, diff_wake_field.min().item(), diff_wake_field.max().item())
-        #prova_percentage_error(diff_wake_field, ax, f"{error_to_plot.capitalize()} Deficit Error")
+        levels = np.linspace(
+            torch.min(diff_wake_field), torch.max(diff_wake_field), 5000
+        )
+        # print(diff_wake_field.shape, diff_wake_field.min().item(), diff_wake_field.max().item())
+        # prova_percentage_error(diff_wake_field, ax, f"{error_to_plot.capitalize()} Deficit Error")
     else:
         raise ValueError(
             f"Invalid type_of_error: {error_to_plot}. "
@@ -363,6 +369,7 @@ def plot_error_submap(
         plot_wind_turbine=plot_wind_turbine,
     )
 
+
 """
 def prova_percentage_error(errors, ax, zlabel):
     import matplotlib.colors as colors
@@ -381,6 +388,7 @@ def prova_percentage_error(errors, ax, zlabel):
     # Add a colorbar
     plt.colorbar(c, label=zlabel, ax=ax)
 """
+
 
 def __plot_contour(
     X,
@@ -421,19 +429,18 @@ def __plot_contour(
     ax.set_title(title)
 
     import matplotlib.ticker as ticker
-    import matplotlib.colors as colors #TODO move to the top
+    import matplotlib.colors as colors  # TODO move to the top
+
     if log_scale:
-        norm=colors.LogNorm(vmin=np.nanmin(Z), vmax=np.nanmax(Z))
+        norm = colors.LogNorm(vmin=np.nanmin(Z), vmax=np.nanmax(Z))
         c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
     else:
         c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
     ax.set_xlim([MIN_X, MAX_X])
     ax.set_ylim([MIN_Y, MAX_Y])
 
-
-
     cbar = plt.colorbar(c, label=zlabel, ax=ax)
-    #plt.colorbar(c, label=zlabel, ax=ax, ticks=[levels.min(), levels.max()]) ##TODO remove
+    # plt.colorbar(c, label=zlabel, ax=ax, ticks=[levels.min(), levels.max()]) ##TODO remove
 
     cbar.locator = ticker.MaxNLocator(nbins=6)  # Set maximum number of ticks
     cbar.update_ticks()
