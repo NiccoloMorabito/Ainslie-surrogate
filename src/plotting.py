@@ -4,28 +4,40 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torch
-from matplotlib.patches import Ellipse
 import os
 from py_wake.wind_turbines import WindTurbine, WindTurbines
 
 DEFAULT_XLABEL = "Downwind distance [x/D]"
 DEFAULT_YLABEL = "Crosswind distance [y/D]"
 
-DEFICIT_LEVELS = np.linspace(
-    0, 1, 5000
-)  # default levels for deficit, as the range is [0,1)
+DEFICIT_LEVELS = [
+    0,
+    0.0025,
+    0.005,
+    0.0075,
+    0.010,
+    0.015,
+    0.020,
+    0.025,
+    0.030,
+    0.035,
+    0.040,
+    0.045,
+    0.050,
+    0.055,
+]
+PCT_LEVELS_ABS = np.array([1, 2, 4, 8, 16, 32, 64, 128, 256])
+PCT_LEVELS_REL = np.append(-np.flip(PCT_LEVELS_ABS), np.insert(PCT_LEVELS_ABS, 0, 0))
 
-MIN_X = -2  # for plotting near-wake region
-MAX_X = 30
+MIN_X = -1
+MAX_X = 29.875
 MIN_Y = -1.875
 MAX_Y = 1.875
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TURBINE_SYMBOL_PATH = os.path.join(BASE_DIR, "src/turbine.png")
 
-# CONTOUR PLOTS
-# TODO decide whether to use the same range of deficits for all the plots (like it's currently done in plot_maps)
-# TODO try using the log scale ?
+plt.rcParams["font.size"] = 11
 
 
 def plot_ct_curve(turbines: list[WindTurbine]) -> None:
@@ -42,7 +54,7 @@ def plot_ct_curve(turbines: list[WindTurbine]) -> None:
 def plot_deficit_map_from_df(
     df: pd.DataFrame,
     levels=DEFICIT_LEVELS,
-    cmap: str = "Blues",
+    cmap: str = plt.cm.Blues,
     add_near_wake: bool = False,
     plot_wind_turbine: bool = False,
 ) -> None:
@@ -60,7 +72,7 @@ def plot_deficit_map_from_df(
 def plot_wake_map_from_df(
     df: pd.DataFrame,
     levels: int = 500,
-    cmap: str = "Greens",
+    cmap: str = plt.cm.Greens,
     add_near_wake: bool = False,
     plot_wind_turbine: bool = False,
 ) -> None:
@@ -80,7 +92,7 @@ def plot_map_from_df(
     zname: str,
     zlabel: str,
     levels,
-    cmap: str = "Blues",
+    cmap: str = plt.cm.Blues,
     add_near_wake: bool = False,
     plot_wind_turbine: bool = False,
 ) -> None:
@@ -118,7 +130,7 @@ def plot_map(
     ws: Optional[int] = None,
     zlabel: str = "Wind Deficit",
     levels=DEFICIT_LEVELS,
-    cmap: str = "Blues",
+    cmap: str = plt.cm.Blues,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
 ) -> None:
@@ -155,7 +167,6 @@ def plot_maps(
     error_to_plot: Optional[str] = None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
-    log_scale: bool = True,  # TODO not for the error, at least change the name
     save_path: Optional[str] = None,
 ) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
@@ -163,40 +174,30 @@ def plot_maps(
         original.shape == predicted.shape
     ), "Original and predicted do not have the same shape"
 
-    plt.rcParams["font.size"] = 11  # TODO move to the top (?)
-    max_deficit = max(original.max(), predicted.max())
-    levels = np.linspace(0, max_deficit, 5000)
-
     if error_to_plot is None:
-        fig, axs = plt.subplots(
-            1, 2, figsize=(10, 4)
-        )  # Create a figure with two subplots
+        fig, axs = plt.subplots(1, 2, figsize=(10, 4))
     else:
-        fig, axs = plt.subplots(
-            1, 3, figsize=(15, 4)
-        )  # Create a figure with three subplots
+        fig, axs = plt.subplots(1, 3, figsize=(15, 4))
 
     plot_submap(
         X,
         Y,
         original,
         zlabel=f"Actual {zlabel}",
-        levels=levels,
+        levels=DEFICIT_LEVELS,
         ax=axs[0],
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
-        log_scale=log_scale,
     )
     plot_submap(
         X,
         Y,
         predicted,
         zlabel=f"Predicted {zlabel}",
-        levels=levels,
+        levels=DEFICIT_LEVELS,
         ax=axs[1],
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
-        log_scale=log_scale,
     )
     if error_to_plot is not None:
         plot_error_submap(
@@ -278,11 +279,10 @@ def plot_submap(
     wake_field,
     zlabel: str = "Wind Deficit",
     levels=DEFICIT_LEVELS,
-    cmap: str = "Blues",
+    cmap: str = plt.cm.Blues,
     ax=None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
-    log_scale: bool = False,
 ) -> None:
     assert X.shape == Y.shape, "X and Y grids have not the same shape"
     if wake_field.dim() == 1:
@@ -300,7 +300,6 @@ def plot_submap(
         ax=ax,
         add_near_wake=add_near_wake,
         plot_wind_turbine=plot_wind_turbine,
-        log_scale=log_scale,
     )
 
 
@@ -314,40 +313,34 @@ def plot_error_submap(
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
 ) -> None:
-    # TODO standardize the levels for a better comparison?
+
     if error_to_plot.lower() == "signed":
         diff_wake_field = original_wake_field - predicted_wake_field
-        cmap = "coolwarm"
+        cmap = plt.cm.coolwarm
         levels = np.linspace(
             torch.min(diff_wake_field), torch.max(diff_wake_field), 5000
         )
     elif error_to_plot.lower() == "absolute":
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field)
-        cmap = "Reds"
+        cmap = plt.cm.Reds
         levels = np.linspace(0, torch.max(diff_wake_field), 5000)
     elif error_to_plot.lower() == "relative":
         epsilon = 1e-10
         diff_wake_field = np.abs(original_wake_field - predicted_wake_field) / np.abs(
             predicted_wake_field + epsilon
         )
-        cmap = "Reds"
+        cmap = plt.cm.Reds
         levels = np.linspace(0, torch.max(diff_wake_field), 5000)
     elif error_to_plot.lower() == "absolute percentage":
         diff_wake_field = 100 * torch.abs(
-            (predicted_wake_field - original_wake_field) / original_wake_field
+            predicted_wake_field / original_wake_field - 1
         )
-        cmap = "Reds"
-        levels = np.linspace(0, torch.max(diff_wake_field), 5000)
+        cmap = plt.cm.Reds
+        levels = PCT_LEVELS_ABS
     elif error_to_plot.lower() == "signed percentage":
-        diff_wake_field = (
-            100 * (predicted_wake_field - original_wake_field) / original_wake_field
-        )
-        cmap = "coolwarm"
-        levels = np.linspace(
-            torch.min(diff_wake_field), torch.max(diff_wake_field), 5000
-        )
-        # print(diff_wake_field.shape, diff_wake_field.min().item(), diff_wake_field.max().item())
-        # prova_percentage_error(diff_wake_field, ax, f"{error_to_plot.capitalize()} Deficit Error")
+        diff_wake_field = 100 * predicted_wake_field / original_wake_field - 1
+        cmap = plt.cm.PiYG
+        levels = PCT_LEVELS_REL
     else:
         raise ValueError(
             f"Invalid type_of_error: {error_to_plot}. "
@@ -370,26 +363,6 @@ def plot_error_submap(
     )
 
 
-"""
-def prova_percentage_error(errors, ax, zlabel):
-    import matplotlib.colors as colors
-
-
-    # Create a diverging colormap
-    cmap = plt.get_cmap('coolwarm')
-
-    # Create a logarithmic color scale
-    print(errors.min().item(), errors.max().item())
-    norm = colors.LogNorm(vmin=errors.min().item(), vmax=errors.max().item())
-
-    # Plot the contour map
-    c = ax.contourf(errors, cmap=cmap, norm=norm)
-
-    # Add a colorbar
-    plt.colorbar(c, label=zlabel, ax=ax)
-"""
-
-
 def __plot_contour(
     X,
     Y,
@@ -403,7 +376,6 @@ def __plot_contour(
     ax=None,
     add_near_wake: bool = True,
     plot_wind_turbine: bool = True,
-    log_scale: bool = False,
 ) -> None:
     if not add_near_wake and plot_wind_turbine:
         raise ValueError("Cannot plot wind turbine without adding near-wake region.")
@@ -428,22 +400,18 @@ def __plot_contour(
     ax.set_ylabel(ylabel)
     ax.set_title(title)
 
-    import matplotlib.ticker as ticker
-    import matplotlib.colors as colors  # TODO move to the top
-
-    if log_scale:
-        norm = colors.LogNorm(vmin=np.nanmin(Z), vmax=np.nanmax(Z))
-        c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
-    else:
-        c = ax.contourf(X, Y, Z, levels=levels, cmap=cmap)
+    c = ax.contourf(
+        X,
+        Y,
+        Z,
+        levels=levels,
+        cmap=cmap,
+        cbar_kwargs={"label": None, "spacing": "proportional"},
+    )
     ax.set_xlim([MIN_X, MAX_X])
     ax.set_ylim([MIN_Y, MAX_Y])
 
-    cbar = plt.colorbar(c, label=zlabel, ax=ax)
-    # plt.colorbar(c, label=zlabel, ax=ax, ticks=[levels.min(), levels.max()]) ##TODO remove
-
-    cbar.locator = ticker.MaxNLocator(nbins=6)  # Set maximum number of ticks
-    cbar.update_ticks()
+    plt.colorbar(c, label=zlabel, ax=ax)
 
     if show:
         plt.show()
