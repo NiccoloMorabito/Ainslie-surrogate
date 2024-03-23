@@ -25,7 +25,7 @@ echo "\nfrom .eddy_viscosity import EddyViscosityDeficitModel, EddyViscosityMode
 ```
 
 ## Data
-The data utilized for this project was generated using the [PyWake implementation](https://topfarm.pages.windenergy.dtu.dk/PyWake/) of the Eddy Viscosity (Ainslie) model [[1]](#1).
+The data utilized for this project was generated using the [PyWake implementation](https://topfarm.pages.windenergy.dtu.dk/PyWake/) of the Eddy Viscosity (Ainslie) model.
 
 Relevant notebooks:
 * [`ainslie_data_generation.ipynb`](notebooks/ainslie_data_generation.ipynb) - Data generation process;
@@ -45,6 +45,3 @@ Different results obtained from experiments are saved in the [`metrics/`](metric
 Relevant notebooks:
 * [`logged_metrics_visualizations.ipynb`](notebooks/analysis/logged_metrics_visualizations.ipynb) - Visualizations of logged metrics;
 * [`result_analysis.ipynb`](notebooks/analysis/result_analysis.ipynb) - Visualization, comparison, and further analysis of experiment results.
-
-## References
-<a id="1">[1]</a> John F. Ainslie, "Calculating the flowfield in the wake of wind turbines" (1988). Journal of Wind Engineering and Industrial Aerodynamics.
